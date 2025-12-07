@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Earn Task Platform",
+    "slug": "earn-task-platform",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.earntaskplatform.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.earntaskplatform.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you upload posts."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "The app accesses your camera to let you take photos for posts."
+        }
+      ]
+    ],
+    "scheme": "earntask",
+    "jsEngine": "hermes"
+  }
+}
+

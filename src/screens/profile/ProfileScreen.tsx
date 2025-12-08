@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl, Image, Linking, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { logoutUser, refreshUser } from '@store/slices/authSlice';
 import { formatCoins } from '@utils/validation';
-import { ROUTES } from '@constants';
+import { ROUTES, API_BASE_URL, SUPPORT_CHANNELS } from '@constants';
 import { Ionicons } from '@expo/vector-icons';
 
 const ProfileScreen: React.FC = () => {
@@ -47,11 +47,87 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
+  const handleHelpSupport = () => {
+    Alert.alert(
+      'Help & Support',
+      'Choose a support channel to get help:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Telegram',
+          onPress: () => openTelegram(),
+        },
+        {
+          text: 'WhatsApp',
+          onPress: () => openWhatsApp(),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const openTelegram = async () => {
+    try {
+      const telegramUrl = SUPPORT_CHANNELS.TELEGRAM;
+      const canOpen = await Linking.canOpenURL(telegramUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(telegramUrl);
+      } else {
+        // Try opening in browser if Telegram app is not installed
+        const webUrl = telegramUrl.replace('t.me/', 'web.telegram.org/k/#@');
+        await Linking.openURL(webUrl);
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        'Unable to open Telegram. Please make sure Telegram is installed or try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const openWhatsApp = async () => {
+    try {
+      const whatsappUrl = SUPPORT_CHANNELS.WHATSAPP;
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        Alert.alert(
+          'WhatsApp Not Found',
+          'Please install WhatsApp to contact support.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        'Unable to open WhatsApp. Please make sure WhatsApp is installed or try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Helper to get full avatar URL
+  const getAvatarUrl = (avatar: string | null | undefined): string | null => {
+    if (!avatar) return null;
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+    if (avatar.startsWith('/uploads/')) {
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      return `${baseUrl}${avatar}`;
+    }
+    return avatar;
+  };
+
   const menuItems = [
     {
       icon: 'person-outline',
       title: 'Edit Profile',
-      onPress: () => console.log('Edit Profile'),
+      onPress: () => navigation.navigate(ROUTES.EDIT_PROFILE),
     },
     {
       icon: 'cash-outline',
@@ -86,7 +162,7 @@ const ProfileScreen: React.FC = () => {
     {
       icon: 'help-circle-outline',
       title: 'Help & Support',
-      onPress: () => console.log('Help & Support'),
+      onPress: handleHelpSupport,
     },
     {
       icon: 'log-out-outline',
@@ -106,9 +182,16 @@ const ProfileScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={48} color="#8E8E93" />
-          </View>
+          {user?.avatar ? (
+            <Image 
+              source={{ uri: getAvatarUrl(user.avatar) || '' }} 
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={48} color="#8E8E93" />
+            </View>
+          )}
         </View>
         <Text style={styles.name}>{user?.name || 'User'}</Text>
         <Text style={styles.username}>@{user?.username || 'username'}</Text>
@@ -201,6 +284,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#F2F2F7',
   },
   name: {
     fontSize: 24,

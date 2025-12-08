@@ -33,5 +33,25 @@ export const taskService = {
     });
     return (response.data as { verified: boolean }).verified;
   },
+
+  async submitTaskProof(taskId: string, proofImageUri: string): Promise<{ message: string; submissionStatus: string }> {
+    const formData = new FormData();
+    formData.append('proofImage', {
+      uri: proofImageUri,
+      type: 'image/jpeg',
+      name: 'proof.jpg',
+    } as any);
+
+    const response = await apiService.post<{ message: string; submissionStatus: string }>(
+      `/tasks/${taskId}/submit-proof`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data as { message: string; submissionStatus: string };
+  },
 };
 

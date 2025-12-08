@@ -79,6 +79,12 @@ const AdminDashboardScreen: React.FC = () => {
           >
             <Ionicons name="cash-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate(ROUTES.ADMIN_TASKS)}
+          >
+            <Ionicons name="list-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -141,6 +147,56 @@ const AdminDashboardScreen: React.FC = () => {
                 ≈ {formatCurrency(stats.stats.withdrawals.totalAmount / 100)}
               </Text>
             </View>
+          </View>
+
+          {/* Task Management */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Task Management</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate(ROUTES.ADMIN_TASKS)}
+                style={styles.viewAllButton}
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.taskManagementCard}
+              onPress={() => navigation.navigate(ROUTES.ADMIN_TASKS)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.taskManagementContent}>
+                <View style={styles.taskManagementIcon}>
+                  <Ionicons name="list" size={32} color="#007AFF" />
+                </View>
+                <View style={styles.taskManagementInfo}>
+                  <Text style={styles.taskManagementTitle}>Manage Tasks</Text>
+                  <Text style={styles.taskManagementSubtitle}>
+                    {stats.stats.tasks} total tasks
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.taskManagementCard}
+              onPress={() => navigation.navigate(ROUTES.ADMIN_TASK_SUBMISSIONS)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.taskManagementContent}>
+                <View style={styles.taskManagementIcon}>
+                  <Ionicons name="document-text" size={32} color="#FF9500" />
+                </View>
+                <View style={styles.taskManagementInfo}>
+                  <Text style={styles.taskManagementTitle}>Review Submissions</Text>
+                  <Text style={styles.taskManagementSubtitle}>
+                    Approve or reject task proofs
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Other Stats */}
@@ -319,6 +375,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  taskManagementCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  taskManagementContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  taskManagementIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E3F2FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  taskManagementInfo: {
+    flex: 1,
+  },
+  taskManagementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  taskManagementSubtitle: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   statsRow: {
     flexDirection: 'row',

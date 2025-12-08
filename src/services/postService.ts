@@ -27,6 +27,7 @@ export const postService = {
       ...post,
       id: post._id || post.id,
       userId: post.userId || post.user?._id || post.userId,
+      userAvatar: post.userAvatar ? getImageUrl(post.userAvatar) : undefined,
       imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
       videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
       documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,

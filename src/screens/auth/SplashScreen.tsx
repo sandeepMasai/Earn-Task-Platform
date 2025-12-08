@@ -14,37 +14,57 @@ const SplashScreen: React.FC = () => {
 
   useEffect(() => {
     const initializeApp = async () => {
-      await dispatch(loadUser());
-      
-      // Wait a bit for navigation to be ready
-      setTimeout(async () => {
+      try {
+        await dispatch(loadUser());
+      } catch (error) {
+        console.log('Error loading user:', error);
+      }
+    };
+
+    initializeApp();
+  }, [dispatch]);
+
+  useEffect(() => {
+    // Only navigate after loading is complete
+    if (!isLoading) {
+      const navigateToScreen = async () => {
+        // Wait a bit for navigation to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         try {
           if (isAuthenticated) {
             navigation.replace('MainTabs');
           } else {
             const onboardingComplete = await onboardingStorage.isComplete();
             if (onboardingComplete) {
-              navigation.replace(ROUTES.LOGIN);
+              // Use a small delay to ensure Login screen is registered
+              setTimeout(() => {
+                try {
+                  navigation.replace(ROUTES.LOGIN);
+                } catch (error) {
+                  // If Login screen not available, go to onboarding
+                  console.log('Login screen not available, going to onboarding');
+                  navigation.replace(ROUTES.ONBOARDING);
+                }
+              }, 200);
             } else {
               navigation.replace(ROUTES.ONBOARDING);
             }
           }
         } catch (error) {
           console.log('Navigation error:', error);
-          // Fallback - try again after a short delay
-          setTimeout(() => {
-            if (isAuthenticated) {
-              navigation.replace('MainTabs');
-            } else {
-              navigation.replace(ROUTES.ONBOARDING);
-            }
-          }, 500);
+          // Fallback - navigate to onboarding
+          try {
+            navigation.replace(ROUTES.ONBOARDING);
+          } catch (fallbackError) {
+            console.log('Fallback navigation error:', fallbackError);
+          }
         }
-      }, 2000);
-    };
+      };
 
-    initializeApp();
-  }, [dispatch, navigation, isAuthenticated]);
+      navigateToScreen();
+    }
+  }, [isLoading, isAuthenticated, navigation]);
 
   return (
     <View style={styles.container}>

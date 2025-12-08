@@ -4,6 +4,7 @@ export interface User {
     email: string;
     name: string;
     username: string;
+    avatar?: string | null;
     instagramId?: string;
     coins: number;
     totalEarned: number;
@@ -39,7 +40,67 @@ export interface Task {
     thumbnail?: string;
     isCompleted: boolean;
     completedAt?: string;
+    submissionStatus?: 'available' | 'pending' | 'approved' | 'rejected'; // For Instagram tasks
+    rejectionReason?: string | null;
     createdAt: string;
+}
+
+export interface AdminTask {
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    coins: number;
+    videoUrl?: string;
+    videoDuration?: number;
+    instagramUrl?: string;
+    youtubeUrl?: string;
+    thumbnail?: string;
+    isActive: boolean;
+    completionCount: number;
+    totalCoinsGiven: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface TaskCompletion {
+    userId: string;
+    userName: string;
+    userUsername: string;
+    userEmail?: string;
+    completedAt: string;
+    coinsEarned: number;
+}
+
+export interface TaskSubmission {
+    id: string;
+    task: {
+        id: string;
+        type: string;
+        title: string;
+        coins: number;
+        instagramUrl?: string;
+    };
+    user: {
+        id: string;
+        name: string;
+        username: string;
+        email: string;
+    };
+    proofImage: string;
+    status: 'pending' | 'approved' | 'rejected';
+    rejectionReason?: string | null;
+    reviewedBy?: {
+        id: string;
+        name: string;
+        username: string;
+    } | null;
+    reviewedAt?: string | null;
+    submittedAt: string;
+}
+
+export interface TaskDetails extends AdminTask {
+    completions: TaskCompletion[];
 }
 
 export interface TaskState {
@@ -181,9 +242,16 @@ export type RootStackParamList = {
     AdminUsers: undefined;
     AdminUserDetails: { userId: string };
     AdminCoinManagement: undefined;
+    AdminTasks: undefined;
+    AdminCreateTask: undefined;
+    AdminEditTask: { taskId: string };
+    AdminTaskDetails: { taskId: string };
+    AdminTaskSubmissions: undefined;
+    AdminTaskSubmissionDetails: { submissionId: string };
     WithdrawalHistory: undefined;
     EarningHistory: undefined;
     Referrals: undefined;
+    EditProfile: undefined;
     Comments: { postId: string };
     EditPost: { postId: string; currentCaption: string };
     UserProfile: { userId: string };

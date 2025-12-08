@@ -15,7 +15,7 @@ exports.getFeed = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const posts = await Post.find({ isActive: true })
-      .populate('user', 'name username')
+      .populate('user', 'name username avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -43,7 +43,7 @@ exports.getFeed = async (req, res) => {
               id: post._id.toString(),
               userId: post.user._id.toString(),
               userName: post.user.name,
-              userAvatar: null, // Add avatar field to User model if needed
+              userAvatar: post.user.avatar || null,
               type: post.type,
               imageUrl: post.imageUrl,
               videoUrl: post.videoUrl,
@@ -134,7 +134,7 @@ exports.uploadPost = async (req, res) => {
     }
 
     const post = await Post.create(postData);
-    await post.populate('user', 'name username');
+    await post.populate('user', 'name username avatar');
 
     // Get dynamic coin value for post upload
     const postUploadCoins = await getCoinValue('POST_UPLOAD');
@@ -159,7 +159,7 @@ exports.uploadPost = async (req, res) => {
         id: post._id,
         userId: post.user._id,
         userName: post.user.name,
-        userAvatar: null,
+        userAvatar: post.user.avatar || null,
         type: post.type,
         imageUrl: post.imageUrl,
         videoUrl: post.videoUrl,
@@ -278,7 +278,7 @@ exports.unlikePost = async (req, res) => {
 // @access  Private
 exports.getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('user', 'name username');
+    const post = await Post.findById(req.params.id).populate('user', 'name username avatar');
 
     if (!post) {
       return res.status(404).json({
@@ -293,7 +293,7 @@ exports.getPostById = async (req, res) => {
         id: post._id,
         userId: post.user._id,
         userName: post.user.name,
-        userAvatar: null,
+        userAvatar: post.user.avatar || null,
         type: post.type,
         imageUrl: post.imageUrl,
         videoUrl: post.videoUrl,
@@ -375,7 +375,7 @@ exports.addComment = async (req, res) => {
 // @access  Private
 exports.getComments = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('comments.user', 'name username');
+    const post = await Post.findById(req.params.id).populate('comments.user', 'name username avatar');
 
     if (!post) {
       return res.status(404).json({

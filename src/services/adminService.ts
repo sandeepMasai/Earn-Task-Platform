@@ -234,6 +234,56 @@ export const adminService = {
       id: config._id || config.id,
     }));
   },
+
+  // Task Submissions
+  async getTaskSubmissions(status?: 'pending' | 'approved' | 'rejected', taskType?: string): Promise<TaskSubmission[]> {
+    const params: any = {};
+    if (status) params.status = status;
+    if (taskType) params.taskType = taskType;
+    
+    const response = await apiService.get('/admin/task-submissions', { params });
+    return response.data.map((sub: any) => ({
+      ...sub,
+      id: sub._id || sub.id,
+      task: {
+        ...sub.task,
+        id: sub.task?._id || sub.task?.id,
+      },
+      user: {
+        ...sub.user,
+        id: sub.user?._id || sub.user?.id,
+      },
+    }));
+  },
+
+  async getTaskSubmissionById(submissionId: string): Promise<TaskSubmission> {
+    const response = await apiService.get(`/admin/task-submissions/${submissionId}`);
+    const data = response.data;
+    return {
+      ...data,
+      id: data._id || data.id,
+      task: {
+        ...data.task,
+        id: data.task?._id || data.task?.id,
+      },
+      user: {
+        ...data.user,
+        id: data.user?._id || data.user?.id,
+      },
+    };
+  },
+
+  async approveTaskSubmission(submissionId: string): Promise<{ message: string; coins: number }> {
+    const response = await apiService.put(`/admin/task-submissions/${submissionId}/approve`);
+    return response.data;
+  },
+
+  async rejectTaskSubmission(submissionId: string, rejectionReason?: string): Promise<{ message: string }> {
+    const response = await apiService.put(`/admin/task-submissions/${submissionId}/reject`, {
+      rejectionReason,
+    });
+    return response.data;
+  },
 };
 
 export interface CoinConfig {
@@ -245,5 +295,33 @@ export interface CoinConfig {
   updatedBy?: string;
   updatedAt: string;
   createdAt: string;
+}
+
+export interface TaskSubmission {
+  id: string;
+  task: {
+    id: string;
+    type: string;
+    title: string;
+    coins: number;
+    instagramUrl?: string;
+    youtubeUrl?: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    email: string;
+  };
+  proofImage: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string | null;
+  reviewedBy?: {
+    id: string;
+    name: string;
+    username: string;
+  } | null;
+  reviewedAt?: string | null;
+  submittedAt: string;
 }
 

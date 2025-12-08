@@ -6,9 +6,12 @@ const {
   getMe,
   getUserById,
   updateInstagramId,
+  updateProfile,
+  changePassword,
   logout,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const { body, validationResult } = require('express-validator');
 
 // Validation middleware
@@ -49,6 +52,8 @@ router.post('/login', loginValidation, login);
 router.get('/me', protect, getMe);
 router.get('/user/:userId', protect, getUserById);
 router.put('/instagram-id', protect, updateInstagramId);
+router.put('/profile', protect, upload.single('avatar'), updateProfile);
+router.put('/change-password', protect, changePassword);
 router.post('/logout', protect, logout);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Withdrawal = require('../models/Withdrawal');
 const Transaction = require('../models/Transaction');
 const Task = require('../models/Task');
+const TaskSubmission = require('../models/TaskSubmission');
 const Post = require('../models/Post');
 const CoinConfig = require('../models/CoinConfig');
 const { COIN_VALUES } = require('../constants');
@@ -542,6 +543,241 @@ exports.updateCoinConfigs = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update coin configurations',
+    });
+  }
+};
+
+// @desc    Get all pending task submissions
+// @route   GET /api/admin/task-submissions
+// @access  Private/Admin
+exports.getTaskSubmissions = async (req, res) => {
+  try {
+    const { status, taskType } = req.query;
+    
+    const query = {};
+    if (status) {
+      query.status = status;
+    } else {
+      query.status = 'pending'; // Default to pending
+    }
+
+    const submissions = await TaskSubmission.find(query)
+      .populate('task', 'type title coins instagramUrl youtubeUrl')
+      .populate('user', 'name username email id')
+      .sort({ createdAt: -1 });
+
+    // Filter by task type if provided
+    let filteredSubmissions = submissions;
+    if (taskType) {
+      filteredSubmissions = submissions.filter(
+        (sub) => sub.task && (sub.task.type === taskType)
+      );
+    }
+
+    const formattedSubmissions = filteredSubmissions.map((sub) => ({
+      id: sub._id,
+      task: {
+        id: sub.task?._id,
+        type: sub.task?.type,
+        title: sub.task?.title,
+        coins: sub.task?.coins,
+        instagramUrl: sub.task?.instagramUrl,
+        youtubeUrl: sub.task?.youtubeUrl,
+      },
+      user: {
+        id: sub.user?._id,
+        name: sub.user?.name,
+        username: sub.user?.username,
+        email: sub.user?.email,
+      },
+      proofImage: sub.proofImage,
+      status: sub.status,
+      rejectionReason: sub.rejectionReason,
+      reviewedBy: sub.reviewedBy,
+      reviewedAt: sub.reviewedAt,
+      submittedAt: sub.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: formattedSubmissions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get single task submission details
+// @route   GET /api/admin/task-submissions/:id
+// @access  Private/Admin
+exports.getTaskSubmissionById = async (req, res) => {
+  try {
+    const submission = await TaskSubmission.findById(req.params.id)
+      .populate('task')
+      .populate('user', 'name username email id coins')
+      .populate('reviewedBy', 'name username');
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        error: 'Submission not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: submission._id,
+        task: {
+          id: submission.task?._id,
+          type: submission.task?.type,
+          title: submission.task?.title,
+          description: submission.task?.description,
+          coins: submission.task?.coins,
+          instagramUrl: submission.task?.instagramUrl,
+          youtubeUrl: submission.task?.youtubeUrl,
+        },
+        user: {
+          id: submission.user?._id,
+          name: submission.user?.name,
+          username: submission.user?.username,
+          email: submission.user?.email,
+          coins: submission.user?.coins,
+        },
+        proofImage: submission.proofImage,
+        status: submission.status,
+        rejectionReason: submission.rejectionReason,
+        reviewedBy: submission.reviewedBy
+          ? {
+              id: submission.reviewedBy._id,
+              name: submission.reviewedBy.name,
+              username: submission.reviewedBy.username,
+            }
+          : null,
+        reviewedAt: submission.reviewedAt,
+        submittedAt: submission.createdAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Approve task submission
+// @route   PUT /api/admin/task-submissions/:id/approve
+// @access  Private/Admin
+exports.approveTaskSubmission = async (req, res) => {
+  try {
+    const submission = await TaskSubmission.findById(req.params.id)
+      .populate('task')
+      .populate('user');
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        error: 'Submission not found',
+      });
+    }
+
+    if (submission.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Submission already approved',
+      });
+    }
+
+    // Update submission status
+    submission.status = 'approved';
+    submission.reviewedBy = req.user._id;
+    submission.reviewedAt = new Date();
+    await submission.save();
+
+    // Mark task as completed for user
+    const task = await Task.findById(submission.task._id);
+    if (!task.isCompletedByUser(submission.user._id)) {
+      task.completedBy.push({
+        user: submission.user._id,
+        completedAt: new Date(),
+      });
+      await task.save();
+    }
+
+    // Add coins to user
+    const user = await User.findById(submission.user._id);
+    user.coins += task.coins;
+    user.totalEarned += task.coins;
+    await user.save();
+
+    // Create transaction
+    await Transaction.create({
+      user: submission.user._id,
+      type: 'earned',
+      amount: task.coins,
+      description: `Completed task: ${task.title}`,
+      task: task._id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Task approved and coins credited successfully',
+        coins: task.coins,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Reject task submission
+// @route   PUT /api/admin/task-submissions/:id/reject
+// @access  Private/Admin
+exports.rejectTaskSubmission = async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+
+    const submission = await TaskSubmission.findById(req.params.id);
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        error: 'Submission not found',
+      });
+    }
+
+    if (submission.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot reject an approved submission',
+      });
+    }
+
+    // Update submission status
+    submission.status = 'rejected';
+    submission.rejectionReason = rejectionReason || 'Proof verification failed';
+    submission.reviewedBy = req.user._id;
+    submission.reviewedAt = new Date();
+    await submission.save();
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Task submission rejected',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 };

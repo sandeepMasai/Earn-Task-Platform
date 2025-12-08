@@ -28,11 +28,18 @@ import AdminPaymentsScreen from '@screens/admin/AdminPaymentsScreen';
 import AdminUsersScreen from '@screens/admin/AdminUsersScreen';
 import AdminUserDetailsScreen from '@screens/admin/AdminUserDetailsScreen';
 import AdminCoinManagementScreen from '@screens/admin/AdminCoinManagementScreen';
+import AdminTasksScreen from '@screens/admin/AdminTasksScreen';
+import AdminCreateTaskScreen from '@screens/admin/AdminCreateTaskScreen';
+import AdminEditTaskScreen from '@screens/admin/AdminEditTaskScreen';
+import AdminTaskDetailsScreen from '@screens/admin/AdminTaskDetailsScreen';
+import AdminTaskSubmissionsScreen from '@screens/admin/AdminTaskSubmissionsScreen';
+import AdminTaskSubmissionDetailsScreen from '@screens/admin/AdminTaskSubmissionDetailsScreen';
 
 // Profile Screens
 import WithdrawalHistoryScreen from '@screens/profile/WithdrawalHistoryScreen';
 import EarningHistoryScreen from '@screens/profile/EarningHistoryScreen';
 import ReferralsScreen from '@screens/profile/ReferralsScreen';
+import EditProfileScreen from '@screens/profile/EditProfileScreen';
 
 // Feed Screens
 import CommentsScreen from '@screens/feed/CommentsScreen';
@@ -114,6 +121,36 @@ const AppNavigator: React.FC = () => {
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
+                            name={ROUTES.ADMIN_TASKS}
+                            component={AdminTasksScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_CREATE_TASK}
+                            component={AdminCreateTaskScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_EDIT_TASK}
+                            component={AdminEditTaskScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_TASK_DETAILS}
+                            component={AdminTaskDetailsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_TASK_SUBMISSIONS}
+                            component={AdminTaskSubmissionsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_TASK_SUBMISSION_DETAILS}
+                            component={AdminTaskSubmissionDetailsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
                             name={ROUTES.WITHDRAWAL_HISTORY}
                             component={WithdrawalHistoryScreen}
                             options={{ headerShown: true, title: 'Withdrawal History' }}
@@ -127,6 +164,11 @@ const AppNavigator: React.FC = () => {
                             name={ROUTES.REFERRALS}
                             component={ReferralsScreen}
                             options={{ headerShown: true, title: 'My Referrals' }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.EDIT_PROFILE}
+                            component={EditProfileScreen}
+                            options={{ headerShown: false }}
                         />
                         <Stack.Screen
                             name={ROUTES.COMMENTS}

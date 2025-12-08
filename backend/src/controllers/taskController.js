@@ -1,6 +1,7 @@
 const Task = require('../models/Task');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const TaskSubmission = require('../models/TaskSubmission');
 const { VIDEO_WATCH_PERCENTAGE } = require('../constants');
 const { getCoinValue } = require('../utils/coinHelper');
 
@@ -14,6 +15,21 @@ exports.getTasks = async (req, res) => {
     const tasksWithCompletion = await Promise.all(
       tasks.map(async (task) => {
         const isCompleted = task.isCompletedByUser(req.user._id);
+        
+        // For Instagram and YouTube tasks, check submission status
+        let submissionStatus = null;
+        if (task.type === 'instagram_follow' || task.type === 'instagram_like' || task.type === 'youtube_subscribe') {
+          const submission = await TaskSubmission.findOne({
+            task: task._id,
+            user: req.user._id,
+          });
+          if (submission) {
+            submissionStatus = submission.status; // 'pending', 'approved', 'rejected'
+          } else {
+            submissionStatus = 'available'; // Not submitted yet
+          }
+        }
+
         return {
           id: task._id,
           type: task.type,
@@ -30,6 +46,7 @@ exports.getTasks = async (req, res) => {
             ? task.completedBy.find((c) => c.user.toString() === req.user._id.toString())
                 ?.completedAt
             : null,
+          submissionStatus, // For Instagram tasks: 'available', 'pending', 'approved', 'rejected'
           createdAt: task.createdAt,
         };
       })
@@ -63,6 +80,21 @@ exports.getTaskById = async (req, res) => {
 
     const isCompleted = task.isCompletedByUser(req.user._id);
 
+    // For Instagram and YouTube tasks, check submission status
+    let submissionStatus = null;
+    let submission = null;
+    if (task.type === 'instagram_follow' || task.type === 'instagram_like' || task.type === 'youtube_subscribe') {
+      submission = await TaskSubmission.findOne({
+        task: task._id,
+        user: req.user._id,
+      });
+      if (submission) {
+        submissionStatus = submission.status;
+      } else {
+        submissionStatus = 'available';
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -81,6 +113,8 @@ exports.getTaskById = async (req, res) => {
           ? task.completedBy.find((c) => c.user.toString() === req.user._id.toString())
               ?.completedAt
           : null,
+        submissionStatus,
+        rejectionReason: submission?.rejectionReason || null,
         createdAt: task.createdAt,
       },
     });
@@ -197,6 +231,91 @@ exports.verifyYouTubeSubscribe = async (req, res) => {
       success: true,
       data: {
         verified: true,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Submit task proof (for Instagram tasks)
+// @route   POST /api/tasks/:id/submit-proof
+// @access  Private
+exports.submitTaskProof = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found',
+      });
+    }
+
+    // Only Instagram and YouTube tasks require proof
+    if (task.type !== 'instagram_follow' && task.type !== 'instagram_like' && task.type !== 'youtube_subscribe') {
+      return res.status(400).json({
+        success: false,
+        error: 'This task does not require proof submission',
+      });
+    }
+
+    // Check if proof image is provided
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Proof screenshot is required',
+      });
+    }
+
+    // Check if already submitted
+    const existingSubmission = await TaskSubmission.findOne({
+      task: task._id,
+      user: req.user._id,
+    });
+
+    if (existingSubmission && existingSubmission.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Task already approved',
+      });
+    }
+
+    // If rejected, allow resubmission
+    if (existingSubmission && existingSubmission.status === 'rejected') {
+      existingSubmission.proofImage = req.file.path;
+      existingSubmission.status = 'pending';
+      existingSubmission.rejectionReason = null;
+      existingSubmission.reviewedBy = null;
+      existingSubmission.reviewedAt = null;
+      await existingSubmission.save();
+
+      return res.json({
+        success: true,
+        data: {
+          message: 'Proof resubmitted successfully. Waiting for admin approval.',
+          submissionStatus: 'pending',
+        },
+      });
+    }
+
+    // Create new submission
+    const submission = await TaskSubmission.create({
+      task: task._id,
+      user: req.user._id,
+      proofImage: req.file.path,
+      status: 'pending',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Proof submitted successfully. Waiting for admin approval.',
+        submissionStatus: 'pending',
+        submissionId: submission._id,
       },
     });
   } catch (error) {

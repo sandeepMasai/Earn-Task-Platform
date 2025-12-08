@@ -49,6 +49,12 @@ export const COIN_VALUES = {
 export const MIN_WITHDRAWAL_AMOUNT = 1000;
 export const COIN_TO_RUPEE_RATE = 100; // 100 coins = 1 rupee
 
+// Support Channels
+export const SUPPORT_CHANNELS = {
+  TELEGRAM: 'https://t.me/EranMoneyIndia123', // Update with your Telegram channel/group link
+  WHATSAPP: 'https://wa.me/9772512267', // Update with your WhatsApp number (format: country code + number, no + or spaces)
+} as const;
+
 // Task Types
 export const TASK_TYPES = {
   WATCH_VIDEO: 'watch_video',
@@ -78,7 +84,7 @@ export const ROUTES = {
   LOGIN: 'Login',
   SIGNUP: 'Signup',
   INSTAGRAM_ID: 'InstagramId',
-  
+
   // Main
   HOME: 'Home',
   EARN: 'Earn',
@@ -89,30 +95,37 @@ export const ROUTES = {
   UPLOAD_POST: 'UploadPost',
   FEED: 'Feed',
   PROFILE: 'Profile',
-  
+
   // Tabs
   HOME_TAB: 'HomeTab',
   EARN_TAB: 'EarnTab',
   FEED_TAB: 'FeedTab',
   WALLET_TAB: 'WalletTab',
   PROFILE_TAB: 'ProfileTab',
-  
+
   // Admin
   ADMIN_DASHBOARD: 'AdminDashboard',
   ADMIN_PAYMENTS: 'AdminPayments',
   ADMIN_USERS: 'AdminUsers',
   ADMIN_USER_DETAILS: 'AdminUserDetails',
   ADMIN_COIN_MANAGEMENT: 'AdminCoinManagement',
-  
+  ADMIN_TASKS: 'AdminTasks',
+  ADMIN_CREATE_TASK: 'AdminCreateTask',
+  ADMIN_EDIT_TASK: 'AdminEditTask',
+  ADMIN_TASK_DETAILS: 'AdminTaskDetails',
+  ADMIN_TASK_SUBMISSIONS: 'AdminTaskSubmissions',
+  ADMIN_TASK_SUBMISSION_DETAILS: 'AdminTaskSubmissionDetails',
+
   // Profile
   WITHDRAWAL_HISTORY: 'WithdrawalHistory',
   EARNING_HISTORY: 'EarningHistory',
   REFERRALS: 'Referrals',
-  
+  EDIT_PROFILE: 'EditProfile',
+
   // Feed
   COMMENTS: 'Comments',
   EDIT_POST: 'EditPost',
-  
+
   // User Profile
   USER_PROFILE: 'UserProfile',
 } as const;

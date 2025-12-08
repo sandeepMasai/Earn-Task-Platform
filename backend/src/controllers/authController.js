@@ -138,6 +138,7 @@ exports.login = async (req, res) => {
           email: user.email,
           name: user.name,
           username: user.username,
+          avatar: user.avatar || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -173,6 +174,7 @@ exports.getMe = async (req, res) => {
           email: user.email,
           name: user.name,
           username: user.username,
+          avatar: user.avatar || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -257,6 +259,7 @@ exports.updateInstagramId = async (req, res) => {
           email: user.email,
           name: user.name,
           username: user.username,
+          avatar: user.avatar || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -267,6 +270,143 @@ exports.updateInstagramId = async (req, res) => {
           createdAt: user.createdAt,
         },
       },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, email, username, avatar } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Check if email is being changed and if it's already taken
+    if (email && email !== user.email) {
+      const emailExists = await User.findOne({ email, _id: { $ne: req.user._id } });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email already in use',
+        });
+      }
+      user.email = email;
+    }
+
+    // Check if username is being changed and if it's already taken
+    if (username && username !== user.username) {
+      const usernameExists = await User.findOne({ username: username.toLowerCase(), _id: { $ne: req.user._id } });
+      if (usernameExists) {
+        return res.status(400).json({
+          success: false,
+          error: 'Username already in use',
+        });
+      }
+      user.username = username.toLowerCase();
+    }
+
+    // Update name if provided
+    if (name) {
+      user.name = name;
+    }
+
+    // Update avatar if provided (file upload will set req.file)
+    if (req.file) {
+      user.avatar = `/uploads/${req.file.filename}`;
+    } else if (avatar !== undefined) {
+      user.avatar = avatar;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          avatar: user.avatar,
+          coins: user.coins,
+          totalEarned: user.totalEarned,
+          totalWithdrawn: user.totalWithdrawn,
+          referralCode: user.referralCode,
+          instagramId: user.instagramId,
+          role: user.role || 'user',
+          isActive: user.isActive !== undefined ? user.isActive : true,
+          createdAt: user.createdAt,
+        },
+      },
+      message: 'Profile updated successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Old password and new password are required',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'New password must be at least 6 characters',
+      });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Verify old password
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        error: 'Current password is incorrect',
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
     });
   } catch (error) {
     res.status(500).json({

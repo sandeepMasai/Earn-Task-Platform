@@ -58,5 +58,38 @@ export const authService = {
     });
     return response.data.user;
   },
+
+  async updateProfile(data: {
+    name?: string;
+    email?: string;
+    username?: string;
+    avatar?: string;
+  }): Promise<User> {
+    const formData = new FormData();
+    
+    if (data.name) formData.append('name', data.name);
+    if (data.email) formData.append('email', data.email);
+    if (data.username) formData.append('username', data.username);
+    if (data.avatar && typeof data.avatar === 'string') {
+      formData.append('avatar', data.avatar);
+    } else if (data.avatar && typeof data.avatar === 'object') {
+      // If avatar is a file object
+      formData.append('avatar', data.avatar as any);
+    }
+
+    const response = await apiService.put<{ user: User }>('/auth/profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.user;
+  },
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await apiService.put('/auth/change-password', {
+      oldPassword,
+      newPassword,
+    });
+  },
 };
 

@@ -12,6 +12,10 @@ const {
   getCoinConfigs,
   updateCoinConfig,
   updateCoinConfigs,
+  getTaskSubmissions,
+  getTaskSubmissionById,
+  approveTaskSubmission,
+  rejectTaskSubmission,
 } = require('../controllers/adminController');
 const { admin } = require('../middleware/admin');
 
@@ -33,6 +37,12 @@ router.delete('/users/:id', admin, deleteUser);
 router.get('/coins', admin, getCoinConfigs);
 router.put('/coins', admin, updateCoinConfigs);
 router.put('/coins/:key', admin, updateCoinConfig);
+
+// Task Submissions Review
+router.get('/task-submissions', admin, getTaskSubmissions);
+router.get('/task-submissions/:id', admin, getTaskSubmissionById);
+router.put('/task-submissions/:id/approve', admin, approveTaskSubmission);
+router.put('/task-submissions/:id/reject', admin, rejectTaskSubmission);
 
 module.exports = router;
 

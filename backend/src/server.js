@@ -14,6 +14,7 @@ const walletRoutes = require('./routes/walletRoutes');
 const postRoutes = require('./routes/postRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const adminTaskRoutes = require('./routes/adminTaskRoutes');
 const storyRoutes = require('./routes/storyRoutes');
 const followRoutes = require('./routes/followRoutes');
 
@@ -56,6 +57,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/tasks', adminTaskRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/follow', followRoutes);
 

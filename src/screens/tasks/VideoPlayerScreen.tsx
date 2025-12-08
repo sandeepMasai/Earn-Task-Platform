@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Video, ResizeMode } from 'expo-av';
 import { useAppDispatch } from '@store/hooks';
@@ -24,6 +24,49 @@ const VideoPlayerScreen: React.FC = () => {
   const [watchDuration, setWatchDuration] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [canComplete, setCanComplete] = useState(false);
+
+  // Check if video URL is an Instagram URL
+  const isInstagramUrl = task.videoUrl && (
+    task.videoUrl.includes('instagram.com') ||
+    task.videoUrl.includes('instagr.am')
+  );
+
+  useEffect(() => {
+    // If Instagram URL, show message and allow opening in browser
+    if (isInstagramUrl) {
+      Alert.alert(
+        'Instagram Video',
+        'This video is hosted on Instagram. Please watch it in the Instagram app or browser, then return here to complete the task.',
+        [
+          {
+            text: 'Open in Browser',
+            onPress: async () => {
+              try {
+                const url = task.videoUrl.startsWith('http') 
+                  ? task.videoUrl 
+                  : `https://${task.videoUrl}`;
+                await Linking.openURL(url);
+              } catch (error) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: 'Failed to open video URL',
+                });
+              }
+            },
+          },
+          {
+            text: 'I Watched It',
+            onPress: () => {
+              // Allow manual completion for Instagram videos
+              setCanComplete(true);
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  }, [isInstagramUrl]);
 
   useEffect(() => {
     if (task.videoDuration && watchProgress > 0) {
@@ -55,18 +98,21 @@ const VideoPlayerScreen: React.FC = () => {
   const handleCompleteTask = async () => {
     if (!canComplete || hasCompleted) return;
 
-    const isValid = validateTaskCompletion(
-      watchProgress,
-      task.videoDuration || watchDuration,
-      VIDEO_WATCH_PERCENTAGE
-    );
-
-    if (!isValid) {
-      Alert.alert(
-        'Watch More',
-        `You need to watch at least ${VIDEO_WATCH_PERCENTAGE}% of the video to complete this task.`
+    // For Instagram videos, skip validation
+    if (!isInstagramUrl) {
+      const isValid = validateTaskCompletion(
+        watchProgress,
+        task.videoDuration || watchDuration,
+        VIDEO_WATCH_PERCENTAGE
       );
-      return;
+
+      if (!isValid) {
+        Alert.alert(
+          'Watch More',
+          `You need to watch at least ${VIDEO_WATCH_PERCENTAGE}% of the video to complete this task.`
+        );
+        return;
+      }
     }
 
     try {
@@ -100,7 +146,38 @@ const VideoPlayerScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.videoContainer}>
-        {task.videoUrl ? (
+        {isInstagramUrl ? (
+          <View style={styles.placeholder}>
+            <Ionicons name="logo-instagram" size={64} color="#E4405F" />
+            <Text style={styles.placeholderText}>Instagram Video</Text>
+            <Text style={styles.placeholderSubtext}>
+              This video is hosted on Instagram
+            </Text>
+            <TouchableOpacity
+              style={styles.openButton}
+              onPress={async () => {
+                try {
+                  const url = task.videoUrl.startsWith('http') 
+                    ? task.videoUrl 
+                    : `https://${task.videoUrl}`;
+                  await Linking.openURL(url);
+                } catch (error) {
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to open video URL',
+                  });
+                }
+              }}
+            >
+              <Ionicons name="open-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.openButtonText}>Open in Browser</Text>
+            </TouchableOpacity>
+            <Text style={styles.instructionText}>
+              Watch the video, then return here and click "Complete Task"
+            </Text>
+          </View>
+        ) : task.videoUrl ? (
           <Video
             ref={videoRef}
             source={{ uri: task.videoUrl }}
@@ -116,34 +193,38 @@ const VideoPlayerScreen: React.FC = () => {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.playButton}
-          onPress={handlePlayPause}
-          disabled={!task.videoUrl}
-        >
-          <Ionicons
-            name={isPlaying ? 'pause' : 'play'}
-            size={48}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+        {!isInstagramUrl && (
+          <TouchableOpacity
+            style={styles.playButton}
+            onPress={handlePlayPause}
+            disabled={!task.videoUrl}
+          >
+            <Ionicons
+              name={isPlaying ? 'pause' : 'play'}
+              size={48}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.controls}>
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.min(progressPercentage, 100)}%` },
-              ]}
-            />
+        {!isInstagramUrl && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.min(progressPercentage, 100)}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {formatTime(Math.floor(watchProgress))} /{' '}
+              {formatTime(task.videoDuration || Math.floor(watchDuration))}
+            </Text>
           </View>
-          <Text style={styles.progressText}>
-            {formatTime(Math.floor(watchProgress))} /{' '}
-            {formatTime(task.videoDuration || Math.floor(watchDuration))}
-          </Text>
-        </View>
+        )}
 
         <View style={styles.info}>
           <View style={styles.coinInfo}>
@@ -152,9 +233,15 @@ const VideoPlayerScreen: React.FC = () => {
               Earn {formatCoins(task.coins)} coins
             </Text>
           </View>
-          <Text style={styles.requirement}>
-            Watch at least {VIDEO_WATCH_PERCENTAGE}% to complete
-          </Text>
+          {isInstagramUrl ? (
+            <Text style={styles.requirement}>
+              Watch the video in browser, then return to complete
+            </Text>
+          ) : (
+            <Text style={styles.requirement}>
+              Watch at least {VIDEO_WATCH_PERCENTAGE}% to complete
+            </Text>
+          )}
         </View>
 
         {hasCompleted ? (
@@ -198,6 +285,36 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginTop: 16,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  placeholderSubtext: {
+    color: '#FFFFFF',
+    marginTop: 8,
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  openButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4405F',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 24,
+  },
+  openButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  instructionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginTop: 16,
+    textAlign: 'center',
+    opacity: 0.8,
+    paddingHorizontal: 32,
   },
   playButton: {
     position: 'absolute',

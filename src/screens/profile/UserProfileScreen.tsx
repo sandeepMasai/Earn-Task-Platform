@@ -21,7 +21,7 @@ import Toast from 'react-native-toast-message';
 import PostCard from '@components/feed/PostCard';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Post } from '@types';
-import { ROUTES } from '../../constants/index';
+import { ROUTES, API_BASE_URL } from '../../constants/index';
 
 const UserProfileScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -82,6 +82,19 @@ const UserProfileScreen: React.FC = () => {
     setRefreshing(true);
     await loadUserProfile();
     setRefreshing(false);
+  };
+
+  // Helper to get full avatar URL
+  const getAvatarUrl = (avatar: string | null | undefined): string | null => {
+    if (!avatar) return null;
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+    if (avatar.startsWith('/uploads/')) {
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      return `${baseUrl}${avatar}`;
+    }
+    return avatar;
   };
 
   const handleFollow = async () => {
@@ -179,9 +192,16 @@ const UserProfileScreen: React.FC = () => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={48} color="#8E8E93" />
-            </View>
+            {user?.avatar ? (
+              <Image 
+                source={{ uri: getAvatarUrl(user.avatar) || '' }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={48} color="#8E8E93" />
+              </View>
+            )}
           </View>
           <Text style={styles.name}>{user.name || 'User'}</Text>
           <Text style={styles.username}>@{user.username || 'username'}</Text>
@@ -294,6 +314,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#F2F2F7',
   },
   name: {
     fontSize: 20,

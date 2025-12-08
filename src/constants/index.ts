@@ -115,6 +115,18 @@ export const ROUTES = {
   ADMIN_TASK_DETAILS: 'AdminTaskDetails',
   ADMIN_TASK_SUBMISSIONS: 'AdminTaskSubmissions',
   ADMIN_TASK_SUBMISSION_DETAILS: 'AdminTaskSubmissionDetails',
+  ADMIN_CREATOR_REQUESTS: 'AdminCreatorRequests',
+  ADMIN_CREATOR_COIN_REQUESTS: 'AdminCreatorCoinRequests',
+
+  // Creator
+  CREATOR_REGISTER: 'CreatorRegister',
+  CREATOR_DASHBOARD: 'CreatorDashboard',
+  CREATOR_REQUEST_COINS: 'CreatorRequestCoins',
+  CREATOR_COIN_REQUESTS: 'CreatorCoinRequests',
+  CREATOR_CREATE_TASK: 'CreatorCreateTask',
+  CREATOR_REQUEST_HISTORY: 'CreatorRequestHistory',
+  CREATOR_TASK_SUBMISSIONS: 'CreatorTaskSubmissions',
+  CREATOR_TASK_SUBMISSION_DETAILS: 'CreatorTaskSubmissionDetails',
 
   // Profile
   WITHDRAWAL_HISTORY: 'WithdrawalHistory',

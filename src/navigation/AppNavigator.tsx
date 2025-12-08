@@ -48,6 +48,20 @@ import EditPostScreen from '@screens/feed/EditPostScreen';
 // User Profile Screen
 import UserProfileScreen from '@screens/profile/UserProfileScreen';
 
+// Creator Screens
+import CreatorRegisterScreen from '@screens/creator/CreatorRegisterScreen';
+import CreatorDashboardScreen from '@screens/creator/CreatorDashboardScreen';
+import CreatorRequestCoinsScreen from '@screens/creator/CreatorRequestCoinsScreen';
+import CreatorCoinRequestsScreen from '@screens/creator/CreatorCoinRequestsScreen';
+import CreatorCreateTaskScreen from '@screens/creator/CreatorCreateTaskScreen';
+import CreatorRequestHistoryScreen from '@screens/creator/CreatorRequestHistoryScreen';
+import CreatorTaskSubmissionsScreen from '@screens/creator/CreatorTaskSubmissionsScreen';
+import CreatorTaskSubmissionDetailsScreen from '@screens/creator/CreatorTaskSubmissionDetailsScreen';
+
+// Admin Creator Screens
+import AdminCreatorRequestsScreen from '@screens/admin/AdminCreatorRequestsScreen';
+import AdminCreatorCoinRequestsScreen from '@screens/admin/AdminCreatorCoinRequestsScreen';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
@@ -151,6 +165,16 @@ const AppNavigator: React.FC = () => {
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
+                            name={ROUTES.ADMIN_CREATOR_REQUESTS}
+                            component={AdminCreatorRequestsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ADMIN_CREATOR_COIN_REQUESTS}
+                            component={AdminCreatorCoinRequestsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
                             name={ROUTES.WITHDRAWAL_HISTORY}
                             component={WithdrawalHistoryScreen}
                             options={{ headerShown: true, title: 'Withdrawal History' }}
@@ -183,6 +207,46 @@ const AppNavigator: React.FC = () => {
                         <Stack.Screen
                             name={ROUTES.USER_PROFILE}
                             component={UserProfileScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_REGISTER}
+                            component={CreatorRegisterScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_DASHBOARD}
+                            component={CreatorDashboardScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_REQUEST_COINS}
+                            component={CreatorRequestCoinsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_COIN_REQUESTS}
+                            component={CreatorCoinRequestsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_CREATE_TASK}
+                            component={CreatorCreateTaskScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_REQUEST_HISTORY}
+                            component={CreatorRequestHistoryScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_TASK_SUBMISSIONS}
+                            component={CreatorTaskSubmissionsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_TASK_SUBMISSION_DETAILS}
+                            component={CreatorTaskSubmissionDetailsScreen}
                             options={{ headerShown: false }}
                         />
                     </>

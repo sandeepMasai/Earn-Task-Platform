@@ -40,13 +40,13 @@ const SplashScreen: React.FC = () => {
               // Use a small delay to ensure Login screen is registered
               setTimeout(() => {
                 try {
-                  navigation.replace(ROUTES.LOGIN);
+                  navigation.navigate(ROUTES.LOGIN);
                 } catch (error) {
                   // If Login screen not available, go to onboarding
                   console.log('Login screen not available, going to onboarding');
-                  navigation.replace(ROUTES.ONBOARDING);
+                  navigation.navigate(ROUTES.ONBOARDING);
                 }
-              }, 200);
+              }, 300);
             } else {
               navigation.replace(ROUTES.ONBOARDING);
             }

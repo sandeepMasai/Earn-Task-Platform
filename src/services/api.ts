@@ -34,6 +34,12 @@ class ApiService {
         if (error.response?.status === 401) {
           // Token expired or invalid
           await authStorage.clearAuth();
+          // Don't log repeated 401 errors to reduce noise
+          if (!error.config?.url?.includes('/posts/feed')) {
+            console.log('API Error:', error);
+          }
+        } else {
+          console.log('API Error:', error);
         }
         return Promise.reject(error);
       }
@@ -42,16 +48,25 @@ class ApiService {
 
   async get<T>(url: string, params?: any): Promise<ApiResponse<T>> {
     try {
-      console.log('API GET:', `${this.client.defaults.baseURL}${url}`, params);
+      // Suppress logging for feed pagination to reduce noise
+      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
+        console.log('API GET:', `${this.client.defaults.baseURL}${url}`, params);
+      }
       const response = await this.client.get(url, { params });
-      console.log('API Response:', response.status, response.data);
+      // Suppress logging for feed pagination to reduce noise
+      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
+        console.log('API Response:', response.status, response.data);
+      }
       // Backend returns { success: true, data: ... }
       if (response.data.success) {
         return { success: true, data: response.data.data };
       }
       return response.data;
     } catch (error) {
-      console.error('API GET Error:', error);
+      // Only log first few feed errors to reduce noise
+      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
+        console.error('API GET Error:', error);
+      }
       throw this.handleError(error);
     }
   }

@@ -52,10 +52,16 @@ const FeedScreen: React.FC = () => {
 
   const handleLoadMore = useCallback(() => {
     // Prevent multiple simultaneous requests
+    // Also check if user is authenticated (hasMore will be false on 401)
     if (hasMore && !isLoading && !refreshing) {
       const nextPage = page + 1;
       setPage(nextPage);
-      dispatch(fetchFeed({ page: nextPage, limit: 10 }));
+      dispatch(fetchFeed({ page: nextPage, limit: 10 })).catch((error: any) => {
+        // If 401 error, stop pagination
+        if (error?.message?.includes('401') || error?.message?.includes('Not authorized')) {
+          console.log('Authentication error - stopping feed pagination');
+        }
+      });
     }
   }, [hasMore, isLoading, refreshing, page, dispatch]);
 

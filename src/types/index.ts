@@ -13,10 +13,16 @@ export interface User {
     referredBy?: string;
     createdAt: string;
     updatedAt: string;
-    role?: 'user' | 'admin';
+    role?: 'user' | 'admin' | 'creator';
     isActive?: boolean;
     followersCount?: number;
     followingCount?: number;
+    // Creator fields
+    isCreator?: boolean;
+    creatorStatus?: 'pending' | 'approved' | 'rejected';
+    creatorWallet?: number;
+    creatorYouTubeUrl?: string | null;
+    creatorInstagramUrl?: string | null;
 }
 
 export interface AuthState {
@@ -42,6 +48,12 @@ export interface Task {
     completedAt?: string;
     submissionStatus?: 'available' | 'pending' | 'approved' | 'rejected'; // For Instagram tasks
     rejectionReason?: string | null;
+    // Creator task fields
+    isCreatorTask?: boolean;
+    rewardPerUser?: number;
+    maxUsers?: number;
+    totalBudget?: number;
+    coinsUsed?: number;
     createdAt: string;
 }
 
@@ -248,6 +260,14 @@ export type RootStackParamList = {
     AdminTaskDetails: { taskId: string };
     AdminTaskSubmissions: undefined;
     AdminTaskSubmissionDetails: { submissionId: string };
+    AdminCreatorRequests: undefined;
+    AdminCreatorCoinRequests: undefined;
+    CreatorRegister: undefined;
+    CreatorDashboard: undefined;
+    CreatorRequestCoins: undefined;
+    CreatorCoinRequests: undefined;
+    CreatorCreateTask: undefined;
+    CreatorRequestHistory: undefined;
     WithdrawalHistory: undefined;
     EarningHistory: undefined;
     Referrals: undefined;

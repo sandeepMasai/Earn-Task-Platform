@@ -1,15 +1,26 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '@store/hooks';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAppDispatch, useAppSelector } from '@store/hooks';
+import { refreshUser } from '@store/slices/authSlice';
+import { fetchBalance } from '@store/slices/walletSlice';
 import { formatCoins } from '@utils/validation';
 import { ROUTES } from '@constants';
 import { Ionicons } from '@expo/vector-icons';
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { balance } = useAppSelector((state) => state.wallet);
+
+  // Auto-refresh user data and balance when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(refreshUser());
+      dispatch(fetchBalance());
+    }, [dispatch])
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

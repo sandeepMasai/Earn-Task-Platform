@@ -172,6 +172,43 @@ const ProfileScreen: React.FC = () => {
     },
   ];
 
+  // Creator menu items - show to all users
+  const creatorMenuItems = [];
+  
+  // Always show "Become a Creator" option to all users
+  creatorMenuItems.push({
+    icon: 'star-outline',
+    title: 'Become a Creator',
+    onPress: () => navigation.navigate(ROUTES.CREATOR_REGISTER),
+    color: '#FF9500',
+  });
+
+  // Show request history for all users (to see their registration status)
+  creatorMenuItems.push({
+    icon: 'time-outline',
+    title: 'My Creator Request',
+    onPress: () => navigation.navigate(ROUTES.CREATOR_REQUEST_HISTORY),
+  });
+
+  // Show additional options if user is an approved creator
+  if (user?.isCreator && user?.creatorStatus === 'approved') {
+    creatorMenuItems.push(
+      {
+        icon: 'grid-outline',
+        title: 'Creator Dashboard',
+        onPress: () => navigation.navigate(ROUTES.CREATOR_DASHBOARD),
+        color: '#007AFF',
+      },
+      {
+        icon: 'wallet-outline',
+        title: 'Coin Requests',
+        onPress: () => navigation.navigate(ROUTES.CREATOR_COIN_REQUESTS),
+      }
+    );
+  }
+
+  const allMenuItems = [...menuItems, ...creatorMenuItems];
+
   return (
     <ScrollView 
       style={styles.container} 
@@ -236,7 +273,7 @@ const ProfileScreen: React.FC = () => {
       )}
 
       <View style={styles.menuSection}>
-        {menuItems.map((item, index) => (
+        {allMenuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
             style={styles.menuItem}

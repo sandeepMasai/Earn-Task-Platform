@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { fetchTasks } from '@store/slices/taskSlice';
 import { ROUTES } from '@constants';
@@ -12,9 +12,12 @@ const EarnScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { tasks, isLoading } = useAppSelector((state) => state.tasks);
 
-  useEffect(() => {
-    dispatch(fetchTasks());
-  }, [dispatch]);
+  // Auto-refresh tasks when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchTasks());
+    }, [dispatch])
+  );
 
   const handleRefresh = () => {
     dispatch(fetchTasks());

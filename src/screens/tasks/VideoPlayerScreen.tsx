@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, AppState } from 'react-native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Video, ResizeMode } from 'expo-av';
 import { useAppDispatch } from '@store/hooks';
-import { completeTask } from '@store/slices/taskSlice';
+import { completeTask, fetchTaskById } from '@store/slices/taskSlice';
 import { addCoins } from '@store/slices/walletSlice';
 import { updateUserCoins } from '@store/slices/authSlice';
 import { formatCoins, formatTime } from '@utils/validation';
@@ -24,6 +24,9 @@ const VideoPlayerScreen: React.FC = () => {
   const [watchDuration, setWatchDuration] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [canComplete, setCanComplete] = useState(false);
+  const [youtubeOpenedAt, setYoutubeOpenedAt] = useState<number | null>(null);
+  const [timeSpentWatching, setTimeSpentWatching] = useState(0);
+  const appStateRef = useRef(AppState.currentState);
 
   // Check if video URL is an Instagram URL
   const isInstagramUrl = task.videoUrl && (
@@ -31,12 +34,69 @@ const VideoPlayerScreen: React.FC = () => {
     task.videoUrl.includes('instagr.am')
   );
 
+  // Check if video URL is a YouTube URL
+  const isYouTubeUrl = task.videoUrl && (
+    task.videoUrl.includes('youtube.com') ||
+    task.videoUrl.includes('youtu.be') ||
+    task.videoUrl.includes('youtube.com/shorts')
+  );
+
+  // External URLs that cannot be played directly
+  const isExternalUrl = isInstagramUrl || isYouTubeUrl;
+
+  // Track app state changes to detect when user returns from YouTube
   useEffect(() => {
-    // If Instagram URL, show message and allow opening in browser
-    if (isInstagramUrl) {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (isYouTubeUrl && youtubeOpenedAt) {
+        if (
+          appStateRef.current.match(/inactive|background/) &&
+          nextAppState === 'active'
+        ) {
+          // User returned to app - calculate time spent
+          const timeSpent = Math.floor((Date.now() - youtubeOpenedAt) / 1000);
+          setTimeSpentWatching(timeSpent);
+          
+          // Check if enough time was spent watching
+          const requiredTime = task.videoDuration || 30; // Default 30 seconds
+          const minWatchTime = Math.floor(requiredTime * (VIDEO_WATCH_PERCENTAGE / 100));
+          
+          if (timeSpent >= minWatchTime && !hasCompleted) {
+            // Auto-complete the task
+            handleAutoComplete();
+          } else if (timeSpent > 0) {
+            // Show progress
+            Toast.show({
+              type: 'info',
+              text1: 'Watch Time',
+              text2: `You watched for ${formatTime(timeSpent)}. Need ${formatTime(minWatchTime)} to complete.`,
+            });
+          }
+        }
+      }
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isYouTubeUrl, youtubeOpenedAt, hasCompleted, task.videoDuration]);
+
+  // Refresh only this task when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (task.id && !hasCompleted) {
+        dispatch(fetchTaskById(task.id));
+      }
+    }, [task.id, hasCompleted, dispatch])
+  );
+
+  useEffect(() => {
+    // If external URL (Instagram or YouTube), show message and allow opening in browser
+    if (isExternalUrl) {
+      const platform = isInstagramUrl ? 'Instagram' : 'YouTube';
       Alert.alert(
-        'Instagram Video',
-        'This video is hosted on Instagram. Please watch it in the Instagram app or browser, then return here to complete the task.',
+        `${platform} Video`,
+        `This video is hosted on ${platform}. Please watch it in the ${platform} app or browser, then return here to complete the task.`,
         [
           {
             text: 'Open in Browser',
@@ -46,6 +106,10 @@ const VideoPlayerScreen: React.FC = () => {
                   ? task.videoUrl 
                   : `https://${task.videoUrl}`;
                 await Linking.openURL(url);
+                // Track when YouTube was opened
+                if (isYouTubeUrl) {
+                  setYoutubeOpenedAt(Date.now());
+                }
               } catch (error) {
                 Toast.show({
                   type: 'error',
@@ -58,7 +122,7 @@ const VideoPlayerScreen: React.FC = () => {
           {
             text: 'I Watched It',
             onPress: () => {
-              // Allow manual completion for Instagram videos
+              // Allow manual completion for external videos
               setCanComplete(true);
             },
           },
@@ -66,7 +130,7 @@ const VideoPlayerScreen: React.FC = () => {
         ]
       );
     }
-  }, [isInstagramUrl]);
+  }, [isExternalUrl]);
 
   useEffect(() => {
     if (task.videoDuration && watchProgress > 0) {
@@ -95,11 +159,39 @@ const VideoPlayerScreen: React.FC = () => {
     }
   };
 
+  const handleAutoComplete = async () => {
+    if (hasCompleted) return;
+
+    try {
+      const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
+      const coinsEarned = result.result?.coins || result.coins || task.coins || COIN_VALUES.WATCH_VIDEO;
+      dispatch(addCoins(coinsEarned));
+      dispatch(updateUserCoins(coinsEarned));
+      setHasCompleted(true);
+      Toast.show({
+        type: 'success',
+        text1: 'Task Completed Automatically!',
+        text2: `You earned ${formatCoins(coinsEarned)} coins!`,
+      });
+      // Refresh task to update completion status
+      await dispatch(fetchTaskById(task.id));
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error || 'Failed to complete task',
+      });
+    }
+  };
+
   const handleCompleteTask = async () => {
     if (!canComplete || hasCompleted) return;
 
-    // For Instagram videos, skip validation
-    if (!isInstagramUrl) {
+    // For external videos (Instagram/YouTube), skip validation
+    if (!isExternalUrl) {
       const isValid = validateTaskCompletion(
         watchProgress,
         task.videoDuration || watchDuration,
@@ -118,7 +210,7 @@ const VideoPlayerScreen: React.FC = () => {
     try {
       const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
       // completeTask returns { taskId, result: { coins, message } }
-      const coinsEarned = result.result?.coins || result.coins || COIN_VALUES.WATCH_VIDEO;
+      const coinsEarned = result.result?.coins || result.coins || task.coins || COIN_VALUES.WATCH_VIDEO;
       dispatch(addCoins(coinsEarned));
       dispatch(updateUserCoins(coinsEarned));
       setHasCompleted(true);
@@ -127,6 +219,8 @@ const VideoPlayerScreen: React.FC = () => {
         text1: 'Task Completed!',
         text2: `You earned ${formatCoins(coinsEarned)} coins!`,
       });
+      // Refresh only this task
+      await dispatch(fetchTaskById(task.id));
       setTimeout(() => {
         navigation.goBack();
       }, 2000);
@@ -146,12 +240,18 @@ const VideoPlayerScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.videoContainer}>
-        {isInstagramUrl ? (
+        {isExternalUrl ? (
           <View style={styles.placeholder}>
-            <Ionicons name="logo-instagram" size={64} color="#E4405F" />
-            <Text style={styles.placeholderText}>Instagram Video</Text>
+            <Ionicons 
+              name={isInstagramUrl ? "logo-instagram" : "logo-youtube"} 
+              size={64} 
+              color={isInstagramUrl ? "#E4405F" : "#FF0000"} 
+            />
+            <Text style={styles.placeholderText}>
+              {isInstagramUrl ? 'Instagram' : 'YouTube'} Video
+            </Text>
             <Text style={styles.placeholderSubtext}>
-              This video is hosted on Instagram
+              This video is hosted on {isInstagramUrl ? 'Instagram' : 'YouTube'}
             </Text>
             <TouchableOpacity
               style={styles.openButton}
@@ -161,6 +261,10 @@ const VideoPlayerScreen: React.FC = () => {
                     ? task.videoUrl 
                     : `https://${task.videoUrl}`;
                   await Linking.openURL(url);
+                  // Track when YouTube was opened
+                  if (isYouTubeUrl) {
+                    setYoutubeOpenedAt(Date.now());
+                  }
                 } catch (error) {
                   Toast.show({
                     type: 'error',
@@ -173,8 +277,22 @@ const VideoPlayerScreen: React.FC = () => {
               <Ionicons name="open-outline" size={20} color="#FFFFFF" />
               <Text style={styles.openButtonText}>Open in Browser</Text>
             </TouchableOpacity>
+            {isYouTubeUrl && youtubeOpenedAt && timeSpentWatching > 0 && (
+              <View style={styles.watchTimeInfo}>
+                <Text style={styles.watchTimeText}>
+                  Watch Time: {formatTime(timeSpentWatching)}
+                </Text>
+                {task.videoDuration && (
+                  <Text style={styles.watchTimeText}>
+                    Required: {formatTime(Math.floor(task.videoDuration * (VIDEO_WATCH_PERCENTAGE / 100)))}
+                  </Text>
+                )}
+              </View>
+            )}
             <Text style={styles.instructionText}>
-              Watch the video, then return here and click "Complete Task"
+              {isYouTubeUrl 
+                ? 'Watch the video in YouTube, then return here. Task will complete automatically!'
+                : 'Watch the video, then return here and click "Complete Task"'}
             </Text>
           </View>
         ) : task.videoUrl ? (
@@ -193,7 +311,7 @@ const VideoPlayerScreen: React.FC = () => {
           </View>
         )}
 
-        {!isInstagramUrl && (
+        {!isExternalUrl && (
           <TouchableOpacity
             style={styles.playButton}
             onPress={handlePlayPause}
@@ -315,6 +433,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
     paddingHorizontal: 32,
+  },
+  watchTimeInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    marginHorizontal: 32,
+  },
+  watchTimeText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginVertical: 2,
   },
   playButton: {
     position: 'absolute',

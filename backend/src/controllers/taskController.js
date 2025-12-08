@@ -35,7 +35,7 @@ exports.getTasks = async (req, res) => {
           type: task.type,
           title: task.title,
           description: task.description,
-          coins: task.coins,
+          coins: task.coins || task.rewardPerUser || 0, // Use rewardPerUser for creator tasks
           videoUrl: task.videoUrl,
           videoDuration: task.videoDuration,
           instagramUrl: task.instagramUrl,
@@ -47,6 +47,12 @@ exports.getTasks = async (req, res) => {
                 ?.completedAt
             : null,
           submissionStatus, // For Instagram tasks: 'available', 'pending', 'approved', 'rejected'
+          // Creator task fields
+          isCreatorTask: task.isCreatorTask || false,
+          rewardPerUser: task.rewardPerUser,
+          maxUsers: task.maxUsers,
+          totalBudget: task.totalBudget,
+          coinsUsed: task.coinsUsed,
           createdAt: task.createdAt,
         };
       })
@@ -102,7 +108,7 @@ exports.getTaskById = async (req, res) => {
         type: task.type,
         title: task.title,
         description: task.description,
-        coins: task.coins,
+        coins: task.coins || task.rewardPerUser || 0, // Use rewardPerUser for creator tasks
         videoUrl: task.videoUrl,
         videoDuration: task.videoDuration,
         instagramUrl: task.instagramUrl,
@@ -115,6 +121,12 @@ exports.getTaskById = async (req, res) => {
           : null,
         submissionStatus,
         rejectionReason: submission?.rejectionReason || null,
+        // Creator task fields
+        isCreatorTask: task.isCreatorTask || false,
+        rewardPerUser: task.rewardPerUser,
+        maxUsers: task.maxUsers,
+        totalBudget: task.totalBudget,
+        coinsUsed: task.coinsUsed,
         createdAt: task.createdAt,
       },
     });
@@ -162,24 +174,68 @@ exports.completeTask = async (req, res) => {
       }
     }
 
+    // For creator tasks, check if still active and has budget
+    if (task.isCreatorTask) {
+      if (!task.isActive) {
+        return res.status(400).json({
+          success: false,
+          error: 'This task is no longer active. Budget has been exhausted.',
+        });
+      }
+
+      const rewardAmount = task.rewardPerUser || task.coins;
+      const remainingBudget = task.totalBudget - (task.coinsUsed || 0);
+
+      if (remainingBudget < rewardAmount) {
+        task.isActive = false;
+        await task.save();
+        return res.status(400).json({
+          success: false,
+          error: 'This task is no longer active. Budget has been exhausted.',
+        });
+      }
+
+      if (task.completedBy.length >= task.maxUsers) {
+        task.isActive = false;
+        await task.save();
+        return res.status(400).json({
+          success: false,
+          error: 'This task has reached maximum user limit.',
+        });
+      }
+    }
+
     // Mark task as completed
     task.completedBy.push({
       user: req.user._id,
       completedAt: new Date(),
     });
+
+    // For creator tasks, update coins used
+    if (task.isCreatorTask) {
+      const rewardAmount = task.rewardPerUser || task.coins;
+      task.coinsUsed = (task.coinsUsed || 0) + rewardAmount;
+
+      // Check if budget is exhausted or max users reached
+      if (task.coinsUsed >= task.totalBudget || task.completedBy.length >= task.maxUsers) {
+        task.isActive = false;
+      }
+    }
+
     await task.save();
 
     // Add coins to user
+    const rewardAmount = task.isCreatorTask ? (task.rewardPerUser || task.coins) : task.coins;
     const user = await User.findById(req.user._id);
-    user.coins += task.coins;
-    user.totalEarned += task.coins;
+    user.coins += rewardAmount;
+    user.totalEarned += rewardAmount;
     await user.save();
 
     // Create transaction
     await Transaction.create({
       user: req.user._id,
       type: 'earned',
-      amount: task.coins,
+      amount: rewardAmount,
       description: `Completed task: ${task.title}`,
       task: task._id,
     });
@@ -293,10 +349,11 @@ exports.submitTaskProof = async (req, res) => {
       existingSubmission.reviewedAt = null;
       await existingSubmission.save();
 
+      const reviewer = task.isCreatorTask ? 'creator' : 'admin';
       return res.json({
         success: true,
         data: {
-          message: 'Proof resubmitted successfully. Waiting for admin approval.',
+          message: `Proof resubmitted successfully. Waiting for ${reviewer} approval.`,
           submissionStatus: 'pending',
         },
       });
@@ -310,10 +367,11 @@ exports.submitTaskProof = async (req, res) => {
       status: 'pending',
     });
 
+    const reviewer = task.isCreatorTask ? 'creator' : 'admin';
     res.json({
       success: true,
       data: {
-        message: 'Proof submitted successfully. Waiting for admin approval.',
+        message: `Proof submitted successfully. Waiting for ${reviewer} approval.`,
         submissionStatus: 'pending',
         submissionId: submission._id,
       },

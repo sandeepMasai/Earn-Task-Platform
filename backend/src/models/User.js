@@ -64,8 +64,40 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'admin', 'creator'],
       default: 'user',
+    },
+    // Creator fields
+    isCreator: {
+      type: Boolean,
+      default: false,
+    },
+    creatorStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: null,
+    },
+    creatorApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    creatorApprovedAt: {
+      type: Date,
+      default: null,
+    },
+    creatorWallet: {
+      type: Number,
+      default: 0,
+    },
+    // Creator links
+    creatorYouTubeUrl: {
+      type: String,
+      default: null,
+    },
+    creatorInstagramUrl: {
+      type: String,
+      default: null,
     },
     followers: [
       {

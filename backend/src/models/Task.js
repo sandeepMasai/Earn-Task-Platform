@@ -49,6 +49,27 @@ const taskSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    // Creator task fields
+    isCreatorTask: {
+      type: Boolean,
+      default: false,
+    },
+    rewardPerUser: {
+      type: Number,
+      default: null,
+    },
+    maxUsers: {
+      type: Number,
+      default: null,
+    },
+    totalBudget: {
+      type: Number,
+      default: null,
+    },
+    coinsUsed: {
+      type: Number,
+      default: 0,
+    },
     completedBy: [
       {
         user: {

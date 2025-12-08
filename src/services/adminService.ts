@@ -284,6 +284,55 @@ export const adminService = {
     });
     return response.data;
   },
+
+  // Creator Management
+  async getCreatorRequests(status?: string): Promise<any[]> {
+    const params = status ? { status } : {};
+    const response = await apiService.get('/admin/creator-requests', { params });
+    return response.data.map((creator: any) => ({
+      ...creator,
+      id: creator._id || creator.id,
+    }));
+  },
+
+  async approveCreator(creatorId: string): Promise<{ message: string }> {
+    const response = await apiService.put(`/admin/creator-requests/${creatorId}/approve`);
+    return response.data;
+  },
+
+  async rejectCreator(creatorId: string, rejectionReason?: string): Promise<{ message: string }> {
+    const response = await apiService.put(`/admin/creator-requests/${creatorId}/reject`, {
+      rejectionReason,
+    });
+    return response.data;
+  },
+
+  async getCreatorCoinRequests(status?: string): Promise<any[]> {
+    const params = status ? { status } : {};
+    const response = await apiService.get('/admin/creator-coin-requests', { params });
+    return response.data.map((request: any) => ({
+      ...request,
+      id: request._id || request.id,
+      creator: request.creator
+        ? {
+            ...request.creator,
+            id: request.creator._id || request.creator.id,
+          }
+        : null,
+    }));
+  },
+
+  async approveCreatorCoinRequest(requestId: string): Promise<{ message: string; creatorWallet: number; creator: { id: string; name: string; username: string } }> {
+    const response = await apiService.put(`/admin/creator-coin-requests/${requestId}/approve`);
+    return response.data;
+  },
+
+  async rejectCreatorCoinRequest(requestId: string, rejectionReason: string): Promise<{ message: string }> {
+    const response = await apiService.put(`/admin/creator-coin-requests/${requestId}/reject`, {
+      rejectionReason,
+    });
+    return response.data;
+  },
 };
 
 export interface CoinConfig {

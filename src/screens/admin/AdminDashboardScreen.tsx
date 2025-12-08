@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { adminService, DashboardStats } from '@services/adminService';
 import { formatCoins, formatCurrency } from '@utils/validation';
 import { ROUTES } from '@constants';
@@ -35,6 +35,13 @@ const AdminDashboardScreen: React.FC = () => {
   useEffect(() => {
     loadStats();
   }, []);
+
+  // Auto-refresh dashboard when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadStats();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -84,6 +91,18 @@ const AdminDashboardScreen: React.FC = () => {
             onPress={() => navigation.navigate(ROUTES.ADMIN_TASKS)}
           >
             <Ionicons name="list-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate(ROUTES.ADMIN_TASK_SUBMISSIONS)}
+          >
+            <Ionicons name="checkmark-circle-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate(ROUTES.ADMIN_CREATOR_REQUESTS)}
+          >
+            <Ionicons name="star-outline" size={24} color="#FF9500" />
           </TouchableOpacity>
         </View>
       </View>
@@ -192,6 +211,42 @@ const AdminDashboardScreen: React.FC = () => {
                   <Text style={styles.taskManagementTitle}>Review Submissions</Text>
                   <Text style={styles.taskManagementSubtitle}>
                     Approve or reject task proofs
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.taskManagementCard}
+              onPress={() => navigation.navigate(ROUTES.ADMIN_CREATOR_REQUESTS)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.taskManagementContent}>
+                <View style={styles.taskManagementIcon}>
+                  <Ionicons name="star" size={32} color="#FF9500" />
+                </View>
+                <View style={styles.taskManagementInfo}>
+                  <Text style={styles.taskManagementTitle}>Creator Requests</Text>
+                  <Text style={styles.taskManagementSubtitle}>
+                    Approve or reject creator registrations
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.taskManagementCard}
+              onPress={() => navigation.navigate(ROUTES.ADMIN_CREATOR_COIN_REQUESTS)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.taskManagementContent}>
+                <View style={styles.taskManagementIcon}>
+                  <Ionicons name="wallet" size={32} color="#34C759" />
+                </View>
+                <View style={styles.taskManagementInfo}>
+                  <Text style={styles.taskManagementTitle}>Creator Coin Requests</Text>
+                  <Text style={styles.taskManagementSubtitle}>
+                    Approve or reject coin requests (UPI: sk245444@ybl)
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={24} color="#8E8E93" />

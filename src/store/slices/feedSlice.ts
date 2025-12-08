@@ -178,6 +178,15 @@ const feedSlice = createSlice({
       .addCase(fetchFeed.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        // Stop pagination on 401 errors (unauthorized) or any authentication errors
+        const errorMessage = action.payload as string;
+        if (errorMessage && (
+          errorMessage.includes('401') || 
+          errorMessage.includes('Not authorized') ||
+          errorMessage.includes('no token')
+        )) {
+          state.hasMore = false;
+        }
       });
 
     // Upload Post

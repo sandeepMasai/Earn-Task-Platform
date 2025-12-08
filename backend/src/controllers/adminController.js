@@ -3,6 +3,7 @@ const Withdrawal = require('../models/Withdrawal');
 const Transaction = require('../models/Transaction');
 const Task = require('../models/Task');
 const TaskSubmission = require('../models/TaskSubmission');
+const CreatorCoinRequest = require('../models/CreatorCoinRequest');
 const Post = require('../models/Post');
 const CoinConfig = require('../models/CoinConfig');
 const { COIN_VALUES } = require('../constants');
@@ -547,7 +548,7 @@ exports.updateCoinConfigs = async (req, res) => {
   }
 };
 
-// @desc    Get all pending task submissions
+// @desc    Get all pending task submissions (only admin tasks, not creator tasks)
 // @route   GET /api/admin/task-submissions
 // @access  Private/Admin
 exports.getTaskSubmissions = async (req, res) => {
@@ -561,10 +562,16 @@ exports.getTaskSubmissions = async (req, res) => {
       query.status = 'pending'; // Default to pending
     }
 
-    const submissions = await TaskSubmission.find(query)
-      .populate('task', 'type title coins instagramUrl youtubeUrl')
+    // Get all submissions
+    const allSubmissions = await TaskSubmission.find(query)
+      .populate('task', 'type title coins instagramUrl youtubeUrl isCreatorTask createdBy')
       .populate('user', 'name username email id')
       .sort({ createdAt: -1 });
+
+    // Filter out creator task submissions (only show admin-created tasks)
+    const submissions = allSubmissions.filter(
+      (sub) => !sub.task?.isCreatorTask
+    );
 
     // Filter by task type if provided
     let filteredSubmissions = submissions;
@@ -685,6 +692,15 @@ exports.approveTaskSubmission = async (req, res) => {
       });
     }
 
+    // Admin should only approve non-creator tasks
+    const task = await Task.findById(submission.task._id);
+    if (task.isCreatorTask) {
+      return res.status(400).json({
+        success: false,
+        error: 'This is a creator task. Please use the creator approval endpoint.',
+      });
+    }
+
     if (submission.status === 'approved') {
       return res.status(400).json({
         success: false,
@@ -699,26 +715,39 @@ exports.approveTaskSubmission = async (req, res) => {
     await submission.save();
 
     // Mark task as completed for user
-    const task = await Task.findById(submission.task._id);
+    // Reuse the task variable already fetched above
     if (!task.isCompletedByUser(submission.user._id)) {
       task.completedBy.push({
         user: submission.user._id,
         completedAt: new Date(),
       });
+
+      // For creator tasks, update coins used and check if budget is exhausted
+      if (task.isCreatorTask) {
+        const rewardAmount = task.rewardPerUser || task.coins;
+        task.coinsUsed = (task.coinsUsed || 0) + rewardAmount;
+
+        // Check if budget is exhausted
+        if (task.coinsUsed >= task.totalBudget || task.completedBy.length >= task.maxUsers) {
+          task.isActive = false;
+        }
+      }
+
       await task.save();
     }
 
     // Add coins to user
+    const rewardAmount = task.isCreatorTask ? (task.rewardPerUser || task.coins) : task.coins;
     const user = await User.findById(submission.user._id);
-    user.coins += task.coins;
-    user.totalEarned += task.coins;
+    user.coins += rewardAmount;
+    user.totalEarned += rewardAmount;
     await user.save();
 
     // Create transaction
     await Transaction.create({
       user: submission.user._id,
       type: 'earned',
-      amount: task.coins,
+      amount: rewardAmount,
       description: `Completed task: ${task.title}`,
       task: task._id,
     });
@@ -782,3 +811,324 @@ exports.rejectTaskSubmission = async (req, res) => {
   }
 };
 
+
+// @desc    Get all creator requests
+// @route   GET /api/admin/creator-requests
+// @access  Private/Admin
+exports.getCreatorRequests = async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    const query = { isCreator: true };
+    if (status) {
+      query.creatorStatus = status;
+    }
+    // If no status filter, show all (pending, approved, rejected)
+
+    const creators = await User.find(query)
+      .populate('creatorApprovedBy', 'name username')
+      .select('name username email creatorStatus creatorYouTubeUrl creatorInstagramUrl creatorApprovedBy creatorApprovedAt createdAt')
+      .sort({ createdAt: -1 });
+
+    const formattedCreators = creators.map((creator) => ({
+      id: creator._id,
+      name: creator.name,
+      username: creator.username,
+      email: creator.email,
+      status: creator.creatorStatus,
+      youtubeUrl: creator.creatorYouTubeUrl,
+      instagramUrl: creator.creatorInstagramUrl,
+      approvedBy: creator.creatorApprovedBy
+        ? {
+            id: creator.creatorApprovedBy._id,
+            name: creator.creatorApprovedBy.name,
+            username: creator.creatorApprovedBy.username,
+          }
+        : null,
+      approvedAt: creator.creatorApprovedAt,
+      requestedAt: creator.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: formattedCreators,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Approve creator request
+// @route   PUT /api/admin/creator-requests/:id/approve
+// @access  Private/Admin
+exports.approveCreator = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!user.isCreator) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not a creator',
+      });
+    }
+
+    if (user.creatorStatus === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Creator already approved',
+      });
+    }
+
+    user.creatorStatus = 'approved';
+    user.creatorApprovedBy = req.user._id;
+    user.creatorApprovedAt = new Date();
+    user.role = 'creator';
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Creator approved successfully',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Reject creator request
+// @route   PUT /api/admin/creator-requests/:id/reject
+// @access  Private/Admin
+exports.rejectCreator = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!user.isCreator) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not a creator',
+      });
+    }
+
+    user.creatorStatus = 'rejected';
+    user.isCreator = false;
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Creator request rejected',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get all creator coin requests
+// @route   GET /api/admin/creator-coin-requests
+// @access  Private/Admin
+exports.getCreatorCoinRequests = async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+    // If no status filter, show all requests (pending, approved, rejected)
+
+    const requests = await CreatorCoinRequest.find(query)
+      .populate('creator', 'name username email')
+      .populate('reviewedBy', 'name username')
+      .sort({ createdAt: -1 });
+
+    const formattedRequests = requests.map((req) => ({
+      id: req._id,
+      creator: {
+        id: req.creator?._id,
+        name: req.creator?.name,
+        username: req.creator?.username,
+        email: req.creator?.email,
+      },
+      coins: req.coins,
+      amount: req.amount,
+      paymentProof: req.paymentProof,
+      status: req.status,
+      rejectionReason: req.rejectionReason,
+      reviewedBy: req.reviewedBy
+        ? {
+            id: req.reviewedBy._id,
+            name: req.reviewedBy.name,
+            username: req.reviewedBy.username,
+          }
+        : null,
+      reviewedAt: req.reviewedAt,
+      requestedAt: req.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: formattedRequests,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Approve creator coin request
+// @route   PUT /api/admin/creator-coin-requests/:id/approve
+// @access  Private/Admin
+exports.approveCreatorCoinRequest = async (req, res) => {
+  try {
+    const request = await CreatorCoinRequest.findById(req.params.id).populate('creator');
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        error: 'Request not found',
+      });
+    }
+
+    if (request.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Request already approved',
+      });
+    }
+
+    // Add coins to creator wallet
+    const creator = await User.findById(request.creator._id);
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator not found',
+      });
+    }
+
+    creator.creatorWallet += request.coins;
+    await creator.save();
+
+    // Update request status with review information
+    request.status = 'approved';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    await request.save();
+
+    // Log the approval action (history is saved in the request document)
+    res.json({
+      success: true,
+      data: {
+        message: `Coin request approved. ${request.coins} coins added to ${creator.name}'s (ID: ${creator._id}) wallet`,
+        creatorWallet: creator.creatorWallet,
+        creator: {
+          id: creator._id,
+          name: creator.name,
+          username: creator.username,
+        },
+        reviewedBy: {
+          id: req.user._id,
+          name: req.user.name,
+          username: req.user.username,
+        },
+        reviewedAt: request.reviewedAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Reject creator coin request
+// @route   PUT /api/admin/creator-coin-requests/:id/reject
+// @access  Private/Admin
+exports.rejectCreatorCoinRequest = async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+
+    const request = await CreatorCoinRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        error: 'Request not found',
+      });
+    }
+
+    if (request.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot reject an approved request',
+      });
+    }
+
+    // Get creator info for history
+    const creator = await User.findById(request.creator._id);
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator not found',
+      });
+    }
+
+    request.status = 'rejected';
+    request.rejectionReason = rejectionReason || 'Payment proof verification failed';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    await request.save();
+
+    // Log the rejection action (history is saved in the request document)
+    res.json({
+      success: true,
+      data: {
+        message: `Coin request rejected for ${creator.name} (ID: ${creator._id})`,
+        creator: {
+          id: creator._id,
+          name: creator.name,
+          username: creator.username,
+        },
+        reviewedBy: {
+          id: req.user._id,
+          name: req.user.name,
+          username: req.user.username,
+        },
+        reviewedAt: request.reviewedAt,
+        rejectionReason: request.rejectionReason,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};

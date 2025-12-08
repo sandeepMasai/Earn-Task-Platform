@@ -16,6 +16,12 @@ const {
   getTaskSubmissionById,
   approveTaskSubmission,
   rejectTaskSubmission,
+  getCreatorRequests,
+  approveCreator,
+  rejectCreator,
+  getCreatorCoinRequests,
+  approveCreatorCoinRequest,
+  rejectCreatorCoinRequest,
 } = require('../controllers/adminController');
 const { admin } = require('../middleware/admin');
 
@@ -43,6 +49,16 @@ router.get('/task-submissions', admin, getTaskSubmissions);
 router.get('/task-submissions/:id', admin, getTaskSubmissionById);
 router.put('/task-submissions/:id/approve', admin, approveTaskSubmission);
 router.put('/task-submissions/:id/reject', admin, rejectTaskSubmission);
+
+// Creator Management
+router.get('/creator-requests', admin, getCreatorRequests);
+router.put('/creator-requests/:id/approve', admin, approveCreator);
+router.put('/creator-requests/:id/reject', admin, rejectCreator);
+
+// Creator Coin Requests
+router.get('/creator-coin-requests', admin, getCreatorCoinRequests);
+router.put('/creator-coin-requests/:id/approve', admin, approveCreatorCoinRequest);
+router.put('/creator-coin-requests/:id/reject', admin, rejectCreatorCoinRequest);
 
 module.exports = router;
 

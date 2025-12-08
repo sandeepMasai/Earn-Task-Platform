@@ -16,16 +16,29 @@ const SplashScreen: React.FC = () => {
     const initializeApp = async () => {
       await dispatch(loadUser());
       
+      // Wait a bit for navigation to be ready
       setTimeout(async () => {
-        if (isAuthenticated) {
-          navigation.replace('MainTabs');
-        } else {
-          const onboardingComplete = await onboardingStorage.isComplete();
-          if (onboardingComplete) {
-            navigation.replace(ROUTES.LOGIN);
+        try {
+          if (isAuthenticated) {
+            navigation.replace('MainTabs');
           } else {
-            navigation.replace(ROUTES.ONBOARDING);
+            const onboardingComplete = await onboardingStorage.isComplete();
+            if (onboardingComplete) {
+              navigation.replace(ROUTES.LOGIN);
+            } else {
+              navigation.replace(ROUTES.ONBOARDING);
+            }
           }
+        } catch (error) {
+          console.log('Navigation error:', error);
+          // Fallback - try again after a short delay
+          setTimeout(() => {
+            if (isAuthenticated) {
+              navigation.replace('MainTabs');
+            } else {
+              navigation.replace(ROUTES.ONBOARDING);
+            }
+          }, 500);
         }
       }, 2000);
     };

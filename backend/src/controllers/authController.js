@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const generateToken = require('../utils/generateToken');
-const { COIN_VALUES } = require('../constants');
+const { getCoinValue } = require('../utils/coinHelper');
 
 // @desc    Register user
 // @route   POST /api/auth/signup
@@ -47,13 +47,14 @@ exports.signup = async (req, res) => {
       try {
         const referrer = await User.findById(referredBy);
         if (referrer) {
-          const bonusAmount = COIN_VALUES.REFERRAL_BONUS;
+          // Get dynamic coin value for referral bonus
+          const bonusAmount = await getCoinValue('REFERRAL_BONUS');
           const oldCoins = referrer.coins;
           
           referrer.coins += bonusAmount;
           referrer.totalEarned += bonusAmount;
           await referrer.save();
-          
+
           console.log(`💰 Referral bonus added: ${oldCoins} → ${referrer.coins} coins for user ${referrer.username}`);
 
           // Create transaction for referrer
@@ -179,6 +180,52 @@ exports.getMe = async (req, res) => {
           instagramId: user.instagramId,
           role: user.role || 'user',
           isActive: user.isActive !== undefined ? user.isActive : true,
+          followersCount: user.followers ? user.followers.length : 0,
+          followingCount: user.following ? user.following.length : 0,
+          createdAt: user.createdAt,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get user by ID
+// @route   GET /api/auth/user/:userId
+// @access  Private
+exports.getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          instagramId: user.instagramId,
+          coins: user.coins,
+          totalEarned: user.totalEarned,
+          totalWithdrawn: user.totalWithdrawn,
+          referralCode: user.referralCode,
+          role: user.role || 'user',
+          isActive: user.isActive !== undefined ? user.isActive : true,
+          followersCount: user.followers ? user.followers.length : 0,
+          followingCount: user.following ? user.following.length : 0,
           createdAt: user.createdAt,
         },
       },

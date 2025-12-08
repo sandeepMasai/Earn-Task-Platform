@@ -19,28 +19,20 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Allow images, videos, and documents
-  if (
-    file.mimetype.startsWith('image/') ||
-    file.mimetype.startsWith('video/') ||
-    file.mimetype === 'application/pdf' ||
-    file.mimetype === 'text/plain' ||
-    file.mimetype === 'application/msword' ||
-    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ) {
+  if (file.mimetype.startsWith('video/')) {
     cb(null, true);
   } else {
-    cb(new Error('File type not allowed. Only images, videos, PDFs, and documents are allowed'), false);
+    cb(new Error('Only video files are allowed'), false);
   }
 };
 
-const upload = multer({
+const uploadVideo = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB for videos
+    fileSize: parseInt(process.env.MAX_VIDEO_SIZE) || 100 * 1024 * 1024, // 100MB
   },
   fileFilter: fileFilter,
 });
 
-module.exports = upload;
+module.exports = uploadVideo;
 

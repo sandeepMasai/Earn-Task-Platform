@@ -2,11 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
-import { fetchFeed, likePost, unlikePost, clearFeed } from '@store/slices/feedSlice';
-import { ROUTES } from '@constants';
+import { fetchFeed, likePost, unlikePost, clearFeed, followUser, unfollowUser, updatePost, deletePost } from '@store/slices/feedSlice';
+import { ROUTES } from '../../constants/index';
 import PostCard from '@components/feed/PostCard';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 
 const FeedScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -14,6 +15,8 @@ const FeedScreen: React.FC = () => {
   const { posts, isLoading, hasMore } = useAppSelector((state) => state.feed);
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+  const [currentPlayingVideo, setCurrentPlayingVideo] = useState<string | null>(null);
 
   const loadFeed = useCallback(() => {
     setPage(1);
@@ -24,6 +27,13 @@ const FeedScreen: React.FC = () => {
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
+
+  // Reset page when feed is cleared
+  useEffect(() => {
+    if (posts.length === 0 && !isLoading && page > 1) {
+      setPage(1);
+    }
+  }, [posts.length, isLoading, page]);
 
   // Refresh when screen comes into focus (e.g., after uploading a post)
   useFocusEffect(
@@ -40,13 +50,14 @@ const FeedScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleLoadMore = () => {
-    if (hasMore && !isLoading) {
+  const handleLoadMore = useCallback(() => {
+    // Prevent multiple simultaneous requests
+    if (hasMore && !isLoading && !refreshing) {
       const nextPage = page + 1;
       setPage(nextPage);
       dispatch(fetchFeed({ page: nextPage, limit: 10 }));
     }
-  };
+  }, [hasMore, isLoading, refreshing, page, dispatch]);
 
   const handleLike = (postId: string, isLiked: boolean) => {
     if (isLiked) {
@@ -58,6 +69,55 @@ const FeedScreen: React.FC = () => {
 
   const handleComment = (postId: string) => {
     navigation.navigate(ROUTES.COMMENTS, { postId });
+  };
+
+  const handleFollow = async (userId: string, isFollowing: boolean) => {
+    try {
+      if (isFollowing) {
+        await dispatch(unfollowUser(userId)).unwrap();
+        Toast.show({
+          type: 'success',
+          text1: 'Unfollowed',
+          text2: 'You have unfollowed this user',
+        });
+      } else {
+        await dispatch(followUser(userId)).unwrap();
+        Toast.show({
+          type: 'success',
+          text1: 'Following',
+          text2: 'You are now following this user',
+        });
+      }
+      // Update posts in place - Redux slice will update the follow status automatically
+    } catch (error: any) {
+      console.error('Follow/unfollow error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.message || 'Failed to follow/unfollow user. Please try again.',
+      });
+    }
+  };
+
+  const handleEdit = (postId: string, currentCaption: string) => {
+    navigation.navigate(ROUTES.EDIT_POST, { postId, currentCaption });
+  };
+
+  const handleDelete = async (postId: string) => {
+    try {
+      await dispatch(deletePost(postId)).unwrap();
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Post deleted successfully',
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.message || 'Failed to delete post',
+      });
+    }
   };
 
   if (isLoading && posts.length === 0) {
@@ -79,16 +139,59 @@ const FeedScreen: React.FC = () => {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PostCard
-            post={item}
-            onLike={() => handleLike(item.id, item.isLiked)}
-            onComment={() => handleComment(item.id)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const isVisible = visibleItems.has(item.id);
+          const shouldPlay = currentPlayingVideo === item.id && item.type === 'video';
+          
+          return (
+            <PostCard
+              post={item}
+              onLike={() => handleLike(item.id, item.isLiked)}
+              onComment={() => handleComment(item.id)}
+              onFollow={handleFollow}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              isVisible={isVisible}
+              shouldPlay={shouldPlay}
+            />
+          );
+        }}
+        viewabilityConfig={{
+          itemVisiblePercentThreshold: 50, // Item is considered visible when 50% is shown
+          minimumViewTime: 300, // Minimum time item must be visible (ms)
+        }}
+        onViewableItemsChanged={({ viewableItems }) => {
+          const newVisibleItems = new Set<string>();
+          let firstVideoId: string | null = null;
+          
+          // Find the first visible video post
+          for (const item of viewableItems) {
+            if (item.isViewable && item.item) {
+              newVisibleItems.add(item.item.id);
+              
+              // If this is a video and we don't have a playing video yet, set it
+              if (!firstVideoId && item.item.type === 'video') {
+                firstVideoId = item.item.id;
+              }
+            }
+          }
+          
+          setVisibleItems(newVisibleItems);
+          
+          // Set the first visible video as playing, or clear if none
+          if (firstVideoId) {
+            setCurrentPlayingVideo(firstVideoId);
+          } else {
+            setCurrentPlayingVideo(null);
+          }
+        }}
         contentContainerStyle={styles.listContent}
         onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
+        onEndReachedThreshold={0.3}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={10}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -134,7 +237,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   listContent: {
-    padding: 16,
+    padding: 0,
   },
   emptyContainer: {
     flex: 1,

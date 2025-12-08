@@ -19,7 +19,7 @@ export interface DashboardStats {
     posts: number;
   };
   recentWithdrawals: Withdrawal[];
-  recentUsers: User[];
+  recentUsers: AdminUser[];
 }
 
 export interface Withdrawal {
@@ -40,7 +40,7 @@ export interface Withdrawal {
   rejectionReason?: string;
 }
 
-export interface User {
+export interface AdminUser {
   id: string;
   name: string;
   email: string;
@@ -50,6 +50,9 @@ export interface User {
   totalWithdrawn: number;
   isActive: boolean;
   createdAt: string;
+  referralCode?: string;
+  updatedAt?: string;
+  role?: 'user' | 'admin';
 }
 
 export const adminService = {
@@ -151,7 +154,7 @@ export const adminService = {
     page?: number;
     limit?: number;
   }): Promise<{
-    users: User[];
+    users: AdminUser[];
     pagination: {
       page: number;
       limit: number;
@@ -182,17 +185,17 @@ export const adminService = {
   },
 
   async getUserDetails(id: string): Promise<{
-    user: User;
+    user: AdminUser;
     withdrawals: Withdrawal[];
     transactions: any[];
   }> {
     const response = await apiService.get<{
-      data: { user: User; withdrawals: Withdrawal[]; transactions: any[] };
+      data: { user: AdminUser; withdrawals: Withdrawal[]; transactions: any[] };
     }>(`/admin/users/${id}`);
     return response.data;
   },
 
-  async blockUser(id: string, isActive: boolean): Promise<User> {
+  async blockUser(id: string, isActive: boolean): Promise<AdminUser> {
     const response = await apiService.put<{ data: { user: any } }>(
       `/admin/users/${id}/block`,
       { isActive }
@@ -206,5 +209,41 @@ export const adminService = {
   async deleteUser(id: string): Promise<void> {
     await apiService.delete(`/admin/users/${id}`);
   },
+
+  // Coin Management
+  async getCoinConfigs(): Promise<CoinConfig[]> {
+    const response = await apiService.get('/admin/coins');
+    return response.data.map((config: any) => ({
+      ...config,
+      id: config._id || config.id,
+    }));
+  },
+
+  async updateCoinConfig(key: string, value: number): Promise<CoinConfig> {
+    const response = await apiService.put(`/admin/coins/${key}`, { value });
+    return {
+      ...response.data,
+      id: response.data._id || response.data.id,
+    };
+  },
+
+  async updateCoinConfigs(configs: Array<{ key: string; value: number }>): Promise<CoinConfig[]> {
+    const response = await apiService.put('/admin/coins', { configs });
+    return response.data.map((config: any) => ({
+      ...config,
+      id: config._id || config.id,
+    }));
+  },
 };
+
+export interface CoinConfig {
+  id: string;
+  key: string;
+  value: number;
+  label: string;
+  description: string;
+  updatedBy?: string;
+  updatedAt: string;
+  createdAt: string;
+}
 

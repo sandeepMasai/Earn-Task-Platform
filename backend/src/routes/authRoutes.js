@@ -4,6 +4,7 @@ const {
   signup,
   login,
   getMe,
+  getUserById,
   updateInstagramId,
   logout,
 } = require('../controllers/authController');
@@ -46,6 +47,7 @@ const loginValidation = [
 router.post('/signup', signupValidation, signup);
 router.post('/login', loginValidation, login);
 router.get('/me', protect, getMe);
+router.get('/user/:userId', protect, getUserById);
 router.put('/instagram-id', protect, updateInstagramId);
 router.post('/logout', protect, logout);
 

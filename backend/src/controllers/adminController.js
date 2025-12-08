@@ -3,6 +3,9 @@ const Withdrawal = require('../models/Withdrawal');
 const Transaction = require('../models/Transaction');
 const Task = require('../models/Task');
 const Post = require('../models/Post');
+const CoinConfig = require('../models/CoinConfig');
+const { COIN_VALUES } = require('../constants');
+const { clearCoinCache } = require('../utils/coinHelper');
 
 // @desc    Get admin dashboard stats
 // @route   GET /api/admin/dashboard
@@ -413,6 +416,132 @@ exports.downloadPayments = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+};
+
+// @desc    Get all coin configurations
+// @route   GET /api/admin/coins
+// @access  Private/Admin
+exports.getCoinConfigs = async (req, res) => {
+  try {
+    let configs = await CoinConfig.find().sort({ key: 1 });
+
+    // If no configs exist, initialize with default values
+    if (configs.length === 0) {
+      const defaultConfigs = [
+        { key: 'WATCH_VIDEO', value: COIN_VALUES.WATCH_VIDEO, label: 'Watch Video', description: 'Coins earned for watching a video task' },
+        { key: 'INSTAGRAM_FOLLOW', value: COIN_VALUES.INSTAGRAM_FOLLOW, label: 'Instagram Follow', description: 'Coins earned for following on Instagram' },
+        { key: 'INSTAGRAM_LIKE', value: COIN_VALUES.INSTAGRAM_LIKE, label: 'Instagram Like', description: 'Coins earned for liking on Instagram' },
+        { key: 'YOUTUBE_SUBSCRIBE', value: COIN_VALUES.YOUTUBE_SUBSCRIBE, label: 'YouTube Subscribe', description: 'Coins earned for subscribing on YouTube' },
+        { key: 'REFERRAL_BONUS', value: COIN_VALUES.REFERRAL_BONUS, label: 'Referral Bonus', description: 'Coins earned for each successful referral' },
+        { key: 'POST_UPLOAD', value: COIN_VALUES.POST_UPLOAD, label: 'Post Upload', description: 'Coins earned for uploading a post' },
+        { key: 'DAILY_LOGIN', value: COIN_VALUES.DAILY_LOGIN, label: 'Daily Login', description: 'Coins earned for daily login bonus' },
+        { key: 'POST_LIKE', value: 5, label: 'Post Like', description: 'Coins earned for liking a post' },
+      ];
+
+      configs = await CoinConfig.insertMany(defaultConfigs);
+    }
+
+    res.json({
+      success: true,
+      data: configs,
+    });
+  } catch (error) {
+    console.error('Error getting coin configs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get coin configurations',
+    });
+  }
+};
+
+// @desc    Update coin configuration
+// @route   PUT /api/admin/coins/:key
+// @access  Private/Admin
+exports.updateCoinConfig = async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+
+    if (value === undefined || value < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid coin value is required',
+      });
+    }
+
+    const config = await CoinConfig.findOneAndUpdate(
+      { key },
+      {
+        value,
+        updatedBy: req.user.id,
+        updatedAt: new Date(),
+      },
+      { new: true, upsert: true }
+    );
+
+    // Clear cache so new values are used immediately
+    clearCoinCache();
+
+    res.json({
+      success: true,
+      data: config,
+      message: 'Coin configuration updated successfully',
+    });
+  } catch (error) {
+    console.error('Error updating coin config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update coin configuration',
+    });
+  }
+};
+
+// @desc    Update multiple coin configurations
+// @route   PUT /api/admin/coins
+// @access  Private/Admin
+exports.updateCoinConfigs = async (req, res) => {
+  try {
+    const { configs } = req.body;
+
+    if (!Array.isArray(configs)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Configs must be an array',
+      });
+    }
+
+    const updatePromises = configs.map(({ key, value }) => {
+      if (value < 0) {
+        throw new Error(`Invalid value for ${key}`);
+      }
+      return CoinConfig.findOneAndUpdate(
+        { key },
+        {
+          value,
+          updatedBy: req.user.id,
+          updatedAt: new Date(),
+        },
+        { new: true, upsert: true }
+      );
+    });
+
+    const updatedConfigs = await Promise.all(updatePromises);
+
+    // Clear cache so new values are used immediately
+    clearCoinCache();
+
+    res.json({
+      success: true,
+      data: updatedConfigs,
+      message: 'Coin configurations updated successfully',
+    });
+  } catch (error) {
+    console.error('Error updating coin configs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update coin configurations',
     });
   }
 };

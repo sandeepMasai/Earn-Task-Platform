@@ -7,9 +7,35 @@ const postSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    type: {
+      type: String,
+      enum: ['image', 'video', 'document', 'story', 'reel'],
+      default: 'image',
+    },
     imageUrl: {
       type: String,
-      required: true,
+      default: null,
+    },
+    videoUrl: {
+      type: String,
+      default: null,
+    },
+    documentUrl: {
+      type: String,
+      default: null,
+    },
+    documentType: {
+      type: String,
+      enum: ['pdf', 'text', 'doc', 'docx', null],
+      default: null,
+    },
+    videoDuration: {
+      type: Number, // in seconds
+      default: null,
+    },
+    thumbnailUrl: {
+      type: String,
+      default: null,
     },
     caption: {
       type: String,

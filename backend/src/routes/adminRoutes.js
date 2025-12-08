@@ -9,6 +9,9 @@ const {
   blockUser,
   deleteUser,
   downloadPayments,
+  getCoinConfigs,
+  updateCoinConfig,
+  updateCoinConfigs,
 } = require('../controllers/adminController');
 const { admin } = require('../middleware/admin');
 
@@ -25,6 +28,11 @@ router.get('/users', admin, getAllUsers);
 router.get('/users/:id', admin, getUserDetails);
 router.put('/users/:id/block', admin, blockUser);
 router.delete('/users/:id', admin, deleteUser);
+
+// Coin Management
+router.get('/coins', admin, getCoinConfigs);
+router.put('/coins', admin, updateCoinConfigs);
+router.put('/coins/:key', admin, updateCoinConfig);
 
 module.exports = router;
 

@@ -14,6 +14,8 @@ export interface User {
     updatedAt: string;
     role?: 'user' | 'admin';
     isActive?: boolean;
+    followersCount?: number;
+    followingCount?: number;
 }
 
 export interface AuthState {
@@ -97,12 +99,44 @@ export interface Post {
     userId: string;
     userName: string;
     userAvatar?: string;
-    imageUrl: string;
+    type: 'image' | 'video' | 'document' | 'story' | 'reel';
+    imageUrl?: string;
+    videoUrl?: string;
+    documentUrl?: string;
+    documentType?: 'pdf' | 'text' | 'doc' | 'docx';
+    videoDuration?: number; // in seconds
+    thumbnailUrl?: string;
     caption: string;
     likes: number;
     comments: number;
     isLiked: boolean;
+    followersCount?: number;
+    isFollowing?: boolean;
     createdAt: string;
+}
+
+export interface Story {
+    id: string;
+    userId: string;
+    userName: string;
+    username: string;
+    type: 'image' | 'video';
+    mediaUrl: string;
+    videoDuration?: number;
+    thumbnailUrl?: string;
+    views: number;
+    hasViewed: boolean;
+    createdAt: string;
+    expiresAt: string;
+}
+
+export interface StoryGroup {
+    user: {
+        id: string;
+        name: string;
+        username: string;
+    };
+    stories: Story[];
 }
 
 export interface FeedState {
@@ -146,10 +180,13 @@ export type RootStackParamList = {
     AdminPayments: undefined;
     AdminUsers: undefined;
     AdminUserDetails: { userId: string };
+    AdminCoinManagement: undefined;
     WithdrawalHistory: undefined;
     EarningHistory: undefined;
     Referrals: undefined;
     Comments: { postId: string };
+    EditPost: { postId: string; currentCaption: string };
+    UserProfile: { userId: string };
 };
 
 export type MainTabParamList = {

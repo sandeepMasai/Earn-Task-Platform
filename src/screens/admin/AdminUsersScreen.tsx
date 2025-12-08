@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { adminService, User } from '@services/adminService';
+import { adminService, AdminUser } from '@services/adminService';
 import { formatCoins, formatDate } from '@utils/validation';
 import { ROUTES } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const AdminUsersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +58,7 @@ const AdminUsersScreen: React.FC = () => {
     loadUsers();
   };
 
-  const handleBlockUser = async (user: User) => {
+  const handleBlockUser = async (user: AdminUser) => {
     Alert.alert(
       user.isActive ? 'Block User' : 'Unblock User',
       `Are you sure you want to ${user.isActive ? 'block' : 'unblock'} ${user.name}?`,
@@ -85,7 +85,7 @@ const AdminUsersScreen: React.FC = () => {
     );
   };
 
-  const handleDeleteUser = async (user: User) => {
+  const handleDeleteUser = async (user: AdminUser) => {
     Alert.alert(
       'Delete User',
       `Are you sure you want to delete ${user.name}? This action cannot be undone.`,

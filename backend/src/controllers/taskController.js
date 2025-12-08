@@ -1,7 +1,8 @@
 const Task = require('../models/Task');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
-const { COIN_VALUES, VIDEO_WATCH_PERCENTAGE } = require('../constants');
+const { VIDEO_WATCH_PERCENTAGE } = require('../constants');
+const { getCoinValue } = require('../utils/coinHelper');
 
 // @desc    Get all tasks
 // @route   GET /api/tasks

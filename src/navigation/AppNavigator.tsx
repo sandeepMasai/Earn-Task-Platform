@@ -27,6 +27,7 @@ import AdminDashboardScreen from '@screens/admin/AdminDashboardScreen';
 import AdminPaymentsScreen from '@screens/admin/AdminPaymentsScreen';
 import AdminUsersScreen from '@screens/admin/AdminUsersScreen';
 import AdminUserDetailsScreen from '@screens/admin/AdminUserDetailsScreen';
+import AdminCoinManagementScreen from '@screens/admin/AdminCoinManagementScreen';
 
 // Profile Screens
 import WithdrawalHistoryScreen from '@screens/profile/WithdrawalHistoryScreen';
@@ -35,6 +36,10 @@ import ReferralsScreen from '@screens/profile/ReferralsScreen';
 
 // Feed Screens
 import CommentsScreen from '@screens/feed/CommentsScreen';
+import EditPostScreen from '@screens/feed/EditPostScreen';
+
+// User Profile Screen
+import UserProfileScreen from '@screens/profile/UserProfileScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -104,6 +109,11 @@ const AppNavigator: React.FC = () => {
                             options={{ headerShown: true, title: 'User Details' }}
                         />
                         <Stack.Screen
+                            name={ROUTES.ADMIN_COIN_MANAGEMENT}
+                            component={AdminCoinManagementScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
                             name={ROUTES.WITHDRAWAL_HISTORY}
                             component={WithdrawalHistoryScreen}
                             options={{ headerShown: true, title: 'Withdrawal History' }}
@@ -121,6 +131,16 @@ const AppNavigator: React.FC = () => {
                         <Stack.Screen
                             name={ROUTES.COMMENTS}
                             component={CommentsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.EDIT_POST}
+                            component={EditPostScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.USER_PROFILE}
+                            component={UserProfileScreen}
                             options={{ headerShown: false }}
                         />
                     </>

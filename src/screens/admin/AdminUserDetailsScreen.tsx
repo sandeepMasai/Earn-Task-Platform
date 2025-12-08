@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { adminService, User, Withdrawal } from '@services/adminService';
+import { adminService, AdminUser, Withdrawal } from '@services/adminService';
 import { formatCoins, formatDate } from '@utils/validation';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +19,7 @@ const AdminUserDetailsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { userId } = route.params;
 
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);

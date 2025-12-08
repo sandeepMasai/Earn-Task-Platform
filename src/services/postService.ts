@@ -26,19 +26,56 @@ export const postService = {
     const posts = (feedData.posts || []).map((post: any) => ({
       ...post,
       id: post._id || post.id,
-      imageUrl: getImageUrl(post.imageUrl),
+      userId: post.userId || post.user?._id || post.userId,
+      imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+      videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+      documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+      thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
+      isFollowing: post.isFollowing !== undefined ? post.isFollowing : false,
+      followersCount: post.followersCount !== undefined ? post.followersCount : 0,
     }));
     return { posts, hasMore: feedData.hasMore || false };
   },
 
-  async uploadPost(imageUri: string, caption: string): Promise<Post> {
+  async uploadPost(
+    fileUri: string,
+    caption: string,
+    type: 'image' | 'video' | 'document' = 'image',
+    videoDuration?: number
+  ): Promise<Post> {
     const formData = new FormData();
+    
+    // Determine file type and name
+    let mimeType = 'image/jpeg';
+    let fileName = 'photo.jpg';
+    
+    if (type === 'video') {
+      mimeType = 'video/mp4';
+      fileName = 'video.mp4';
+    } else if (type === 'document') {
+      // Try to detect document type from URI
+      if (fileUri.endsWith('.pdf')) {
+        mimeType = 'application/pdf';
+        fileName = 'document.pdf';
+      } else if (fileUri.endsWith('.txt')) {
+        mimeType = 'text/plain';
+        fileName = 'document.txt';
+      } else {
+        mimeType = 'application/pdf';
+        fileName = 'document.pdf';
+      }
+    }
+
     formData.append('image', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: 'photo.jpg',
+      uri: fileUri,
+      type: mimeType,
+      name: fileName,
     } as any);
     formData.append('caption', caption);
+    formData.append('type', type);
+    if (videoDuration) {
+      formData.append('videoDuration', videoDuration.toString());
+    }
 
     const response = await apiService.post<{ data: Post }>('/posts', formData, {
       headers: {
@@ -49,7 +86,10 @@ export const postService = {
     return {
       ...post,
       id: (post as any)._id || post.id,
-      imageUrl: getImageUrl(post.imageUrl),
+      imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+      videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+      documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+      thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
     };
   },
 
@@ -67,7 +107,10 @@ export const postService = {
     return {
       ...post,
       id: (post as any)._id || post.id,
-      imageUrl: getImageUrl(post.imageUrl),
+      imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+      videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+      documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+      thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
     };
   },
 
@@ -90,6 +133,23 @@ export const postService = {
       ...comment,
       id: comment._id || comment.id,
     }));
+  },
+
+  async updatePost(postId: string, caption: string): Promise<Post> {
+    const response = await apiService.put<{ data: Post }>(`/posts/${postId}`, { caption });
+    const post = response.data;
+    return {
+      ...post,
+      id: (post as any)._id || post.id,
+      imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+      videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+      documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+      thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
+    };
+  },
+
+  async deletePost(postId: string): Promise<void> {
+    await apiService.delete(`/posts/${postId}`);
   },
 };
 

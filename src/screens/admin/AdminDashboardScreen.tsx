@@ -73,6 +73,12 @@ const AdminDashboardScreen: React.FC = () => {
           >
             <Ionicons name="people-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate(ROUTES.ADMIN_COIN_MANAGEMENT)}
+          >
+            <Ionicons name="cash-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
       </View>
 

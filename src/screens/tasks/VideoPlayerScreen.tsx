@@ -7,8 +7,8 @@ import { completeTask } from '@store/slices/taskSlice';
 import { addCoins } from '@store/slices/walletSlice';
 import { updateUserCoins } from '@store/slices/authSlice';
 import { formatCoins, formatTime } from '@utils/validation';
-import { validateTaskCompletion, VIDEO_WATCH_PERCENTAGE } from '@utils/helpers';
-import { COIN_VALUES } from '@constants';
+import { validateTaskCompletion } from '@utils/helpers';
+import { COIN_VALUES, VIDEO_WATCH_PERCENTAGE } from '@constants';
 import Button from '@components/common/Button';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,13 +71,15 @@ const VideoPlayerScreen: React.FC = () => {
 
     try {
       const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
-      dispatch(addCoins(result.coins || COIN_VALUES.WATCH_VIDEO));
-      dispatch(updateUserCoins(result.coins || COIN_VALUES.WATCH_VIDEO));
+      // completeTask returns { taskId, result: { coins, message } }
+      const coinsEarned = result.result?.coins || result.coins || COIN_VALUES.WATCH_VIDEO;
+      dispatch(addCoins(coinsEarned));
+      dispatch(updateUserCoins(coinsEarned));
       setHasCompleted(true);
       Toast.show({
         type: 'success',
         text1: 'Task Completed!',
-        text2: `You earned ${formatCoins(result.coins || COIN_VALUES.WATCH_VIDEO)} coins!`,
+        text2: `You earned ${formatCoins(coinsEarned)} coins!`,
       });
       setTimeout(() => {
         navigation.goBack();

@@ -14,6 +14,8 @@ const walletRoutes = require('./routes/walletRoutes');
 const postRoutes = require('./routes/postRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const storyRoutes = require('./routes/storyRoutes');
+const followRoutes = require('./routes/followRoutes');
 
 const app = express();
 
@@ -54,6 +56,8 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/stories', storyRoutes);
+app.use('/api/follow', followRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

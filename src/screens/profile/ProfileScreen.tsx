@@ -126,6 +126,19 @@ const ProfileScreen: React.FC = () => {
         </View>
       </View>
 
+      {(user?.followersCount !== undefined || user?.followingCount !== undefined) && (
+        <View style={styles.followStatsContainer}>
+          <View style={styles.followStatCard}>
+            <Text style={styles.followStatValue}>{user?.followersCount || 0}</Text>
+            <Text style={styles.followStatLabel}>Followers</Text>
+          </View>
+          <View style={styles.followStatCard}>
+            <Text style={styles.followStatValue}>{user?.followingCount || 0}</Text>
+            <Text style={styles.followStatLabel}>Following</Text>
+          </View>
+        </View>
+      )}
+
       {user?.referralCode && (
         <View style={styles.referralCard}>
           <View style={styles.referralHeader}>
@@ -229,6 +242,34 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  followStatsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  followStatCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  followStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  followStatLabel: {
     fontSize: 12,
     color: '#8E8E93',
   },

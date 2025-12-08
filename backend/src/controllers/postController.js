@@ -1,7 +1,9 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
-const { COIN_VALUES } = require('../constants');
+const { getCoinValue } = require('../utils/coinHelper');
+const fs = require('fs');
+const path = require('path');
 
 // @desc    Get feed
 // @route   GET /api/posts/feed
@@ -24,18 +26,41 @@ exports.getFeed = async (req, res) => {
     res.json({
       success: true,
       data: {
-        posts: posts.map((post) => ({
-          id: post._id,
-          userId: post.user._id,
-          userName: post.user.name,
-          userAvatar: null, // Add avatar field to User model if needed
-          imageUrl: post.imageUrl,
-          caption: post.caption,
-          likes: post.likes.length,
-          comments: post.comments.length,
-          isLiked: post.isLikedByUser(req.user._id),
-          createdAt: post.createdAt,
-        })),
+        posts: await Promise.all(
+          posts.map(async (post) => {
+            const postOwner = await User.findById(post.user._id).select('followers');
+            // Check if current user is following the post owner
+            // The post owner's followers array contains users who follow them
+            // But we need to check if current user is following the post owner
+            // So we check if current user's ID is in the post owner's followers array
+            const isFollowing = postOwner && postOwner.followers 
+              ? postOwner.followers.some(
+                  (id) => id.toString() === req.user._id.toString()
+                ) 
+              : false;
+            
+            return {
+              id: post._id.toString(),
+              userId: post.user._id.toString(),
+              userName: post.user.name,
+              userAvatar: null, // Add avatar field to User model if needed
+              type: post.type,
+              imageUrl: post.imageUrl,
+              videoUrl: post.videoUrl,
+              documentUrl: post.documentUrl,
+              documentType: post.documentType,
+              videoDuration: post.videoDuration,
+              thumbnailUrl: post.thumbnailUrl,
+              caption: post.caption,
+              likes: post.likes.length,
+              comments: post.comments.length,
+              isLiked: post.isLikedByUser(req.user._id),
+              followersCount: postOwner && postOwner.followers ? postOwner.followers.length : 0,
+              isFollowing: isFollowing,
+              createdAt: post.createdAt,
+            };
+          })
+        ),
         hasMore,
       },
     });
@@ -52,36 +77,79 @@ exports.getFeed = async (req, res) => {
 // @access  Private
 exports.uploadPost = async (req, res) => {
   try {
-    const { caption } = req.body;
+    const { caption, type, videoDuration } = req.body;
+    const file = req.file;
 
-    if (!req.file) {
+    if (!file) {
       return res.status(400).json({
         success: false,
-        error: 'Please upload an image',
+        error: 'Please upload a file',
       });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `/uploads/${file.filename}`;
+    const postType = type || (file.mimetype.startsWith('image/') ? 'image' : 
+                              file.mimetype.startsWith('video/') ? 'video' : 'document');
 
-    const post = await Post.create({
+    // Validate video duration (10 seconds minimum, 2 minutes maximum = 120 seconds)
+    if (postType === 'video' && videoDuration) {
+      const duration = parseFloat(videoDuration);
+      
+      if (duration < 10) {
+        return res.status(400).json({
+          success: false,
+          error: 'Video duration must be at least 10 seconds',
+        });
+      }
+      
+      if (duration > 120) {
+        return res.status(400).json({
+          success: false,
+          error: 'Video duration cannot exceed 2 minutes (120 seconds). Please trim your video.',
+        });
+      }
+    }
+
+    const postData = {
       user: req.user._id,
-      imageUrl,
+      type: postType,
       caption: caption || '',
-    });
+    };
 
+    if (postType === 'image') {
+      postData.imageUrl = fileUrl;
+    } else if (postType === 'video') {
+      postData.videoUrl = fileUrl;
+      postData.videoDuration = videoDuration ? parseFloat(videoDuration) : null;
+    } else if (postType === 'document') {
+      postData.documentUrl = fileUrl;
+      // Determine document type
+      if (file.mimetype === 'application/pdf') {
+        postData.documentType = 'pdf';
+      } else if (file.mimetype === 'text/plain') {
+        postData.documentType = 'text';
+      } else if (file.mimetype.includes('word')) {
+        postData.documentType = file.mimetype.includes('openxml') ? 'docx' : 'doc';
+      }
+    }
+
+    const post = await Post.create(postData);
     await post.populate('user', 'name username');
+
+    // Get dynamic coin value for post upload
+    const postUploadCoins = await getCoinValue('POST_UPLOAD');
 
     // Add coins to user
     const user = await User.findById(req.user._id);
-    user.coins += COIN_VALUES.POST_UPLOAD;
-    user.totalEarned += COIN_VALUES.POST_UPLOAD;
+    user.coins += postUploadCoins;
+    user.totalEarned += postUploadCoins;
     await user.save();
 
     // Create transaction
     await Transaction.create({
       user: req.user._id,
       type: 'earned',
-      amount: COIN_VALUES.POST_UPLOAD,
+      amount: postUploadCoins,
       description: 'Post upload reward',
     });
 
@@ -92,7 +160,13 @@ exports.uploadPost = async (req, res) => {
         userId: post.user._id,
         userName: post.user.name,
         userAvatar: null,
+        type: post.type,
         imageUrl: post.imageUrl,
+        videoUrl: post.videoUrl,
+        documentUrl: post.documentUrl,
+        documentType: post.documentType,
+        videoDuration: post.videoDuration,
+        thumbnailUrl: post.thumbnailUrl,
         caption: post.caption,
         likes: 0,
         comments: 0,
@@ -137,6 +211,23 @@ exports.likePost = async (req, res) => {
     });
 
     await post.save();
+
+    // Award coins to user who liked the post (if enabled)
+    const postLikeCoins = await getCoinValue('POST_LIKE');
+    if (postLikeCoins > 0) {
+      const user = await User.findById(req.user._id);
+      user.coins += postLikeCoins;
+      user.totalEarned += postLikeCoins;
+      await user.save();
+
+      // Create transaction
+      await Transaction.create({
+        user: req.user._id,
+        type: 'earned',
+        amount: postLikeCoins,
+        description: 'Post like reward',
+      });
+    }
 
     res.json({
       success: true,
@@ -203,7 +294,13 @@ exports.getPostById = async (req, res) => {
         userId: post.user._id,
         userName: post.user.name,
         userAvatar: null,
+        type: post.type,
         imageUrl: post.imageUrl,
+        videoUrl: post.videoUrl,
+        documentUrl: post.documentUrl,
+        documentType: post.documentType,
+        videoDuration: post.videoDuration,
+        thumbnailUrl: post.thumbnailUrl,
         caption: post.caption,
         likes: post.likes.length,
         comments: post.comments.length,
@@ -299,6 +396,115 @@ exports.getComments = async (req, res) => {
         text: comment.text,
         createdAt: comment.createdAt,
       })),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update post
+// @route   PUT /api/posts/:id
+// @access  Private
+exports.updatePost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { caption } = req.body;
+
+    const post = await Post.findById(id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        error: 'Post not found',
+      });
+    }
+
+    // Check if user owns the post
+    if (post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to update this post',
+      });
+    }
+
+    post.caption = caption || post.caption;
+    await post.save();
+
+    res.json({
+      success: true,
+      data: {
+        id: post._id.toString(),
+        userId: post.user.toString(),
+        caption: post.caption,
+        type: post.type,
+        imageUrl: post.imageUrl,
+        videoUrl: post.videoUrl,
+        documentUrl: post.documentUrl,
+        createdAt: post.createdAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete post
+// @route   DELETE /api/posts/:id
+// @access  Private
+exports.deletePost = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const post = await Post.findById(id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        error: 'Post not found',
+      });
+    }
+
+    // Check if user owns the post
+    if (post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to delete this post',
+      });
+    }
+
+    // Delete associated files
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    const filesToDelete = [
+      post.imageUrl,
+      post.videoUrl,
+      post.documentUrl,
+      post.thumbnailUrl,
+    ].filter(Boolean);
+
+    filesToDelete.forEach((filePath) => {
+      if (filePath && filePath.startsWith('/uploads/')) {
+        const fileFullPath = path.join(__dirname, '../../', filePath);
+        try {
+          if (fs.existsSync(fileFullPath)) {
+            fs.unlinkSync(fileFullPath);
+          }
+        } catch (fileError) {
+          console.error('Error deleting file:', fileError);
+        }
+      }
+    });
+
+    await post.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'Post deleted successfully',
     });
   } catch (error) {
     res.status(500).json({

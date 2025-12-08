@@ -102,6 +102,7 @@ export const ROUTES = {
   ADMIN_PAYMENTS: 'AdminPayments',
   ADMIN_USERS: 'AdminUsers',
   ADMIN_USER_DETAILS: 'AdminUserDetails',
+  ADMIN_COIN_MANAGEMENT: 'AdminCoinManagement',
   
   // Profile
   WITHDRAWAL_HISTORY: 'WithdrawalHistory',
@@ -110,6 +111,10 @@ export const ROUTES = {
   
   // Feed
   COMMENTS: 'Comments',
+  EDIT_POST: 'EditPost',
+  
+  // User Profile
+  USER_PROFILE: 'UserProfile',
 } as const;
 
 // Error Messages

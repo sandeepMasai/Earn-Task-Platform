@@ -8,6 +8,8 @@ const {
   getPostById,
   addComment,
   getComments,
+  updatePost,
+  deletePost,
 } = require('../controllers/postController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -17,6 +19,8 @@ router.post('/', protect, upload.single('image'), uploadPost);
 router.post('/:id/like', protect, likePost);
 router.post('/:id/unlike', protect, unlikePost);
 router.get('/:id', protect, getPostById);
+router.put('/:id', protect, updatePost);
+router.delete('/:id', protect, deletePost);
 router.post('/:id/comments', protect, addComment);
 router.get('/:id/comments', protect, getComments);
 

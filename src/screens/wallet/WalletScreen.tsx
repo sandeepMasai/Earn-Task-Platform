@@ -87,8 +87,8 @@ const WalletScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -221,6 +221,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   transactionItem: {
     flexDirection: 'row',

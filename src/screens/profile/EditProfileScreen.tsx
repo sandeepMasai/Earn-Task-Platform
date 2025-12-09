@@ -195,11 +195,11 @@ const EditProfileScreen: React.FC = () => {
         formData.append('name', name.trim());
         formData.append('email', email.trim());
         formData.append('username', username.trim());
-        
+
         const filename = avatar.split('/').pop() || 'photo.jpg';
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
+
         formData.append('avatar', {
           uri: avatar,
           name: filename,
@@ -211,7 +211,7 @@ const EditProfileScreen: React.FC = () => {
         if (!token) {
           throw new Error('No authentication token found. Please login again.');
         }
-        
+
         const baseUrl = API_BASE_URL.replace('/api', '');
         const response = await fetch(`${baseUrl}/api/auth/profile`, {
           method: 'PUT',
@@ -226,7 +226,7 @@ const EditProfileScreen: React.FC = () => {
           const errorData = await response.json().catch(() => ({ error: 'Failed to update profile' }));
           throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`);
         }
-        
+
         const result = await response.json();
         if (!result.success) {
           throw new Error(result.error || result.message || 'Failed to update profile');
@@ -454,6 +454,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
+    marginTop: 20,
   },
   placeholder: {
     width: 32,
@@ -513,6 +514,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
   },
   passwordHeader: {
     flexDirection: 'row',

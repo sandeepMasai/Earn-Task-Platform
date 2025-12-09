@@ -148,7 +148,7 @@ const FeedScreen: React.FC = () => {
         renderItem={({ item }) => {
           const isVisible = visibleItems.has(item.id);
           const shouldPlay = currentPlayingVideo === item.id && item.type === 'video';
-          
+
           return (
             <PostCard
               post={item}
@@ -169,21 +169,21 @@ const FeedScreen: React.FC = () => {
         onViewableItemsChanged={({ viewableItems }) => {
           const newVisibleItems = new Set<string>();
           let firstVideoId: string | null = null;
-          
+
           // Find the first visible video post
           for (const item of viewableItems) {
             if (item.isViewable && item.item) {
               newVisibleItems.add(item.item.id);
-              
+
               // If this is a video and we don't have a playing video yet, set it
               if (!firstVideoId && item.item.type === 'video') {
                 firstVideoId = item.item.id;
               }
             }
           }
-          
+
           setVisibleItems(newVisibleItems);
-          
+
           // Set the first visible video as playing, or clear if none
           if (firstVideoId) {
             setCurrentPlayingVideo(firstVideoId);
@@ -238,6 +238,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
+    marginTop: 20,
   },
   uploadButton: {
     padding: 4,

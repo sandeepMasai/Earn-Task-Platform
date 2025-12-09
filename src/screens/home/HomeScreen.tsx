@@ -26,7 +26,7 @@ const HomeScreen: React.FC = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, {user?.name || 'User'}!</Text>
+          <Text style={styles.greeting}>Welcome, {user?.name || 'User'}</Text>
           <Text style={styles.subtitle}>Start earning coins today</Text>
         </View>
         <View style={styles.coinCard}>
@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 4,
+    marginTop: 20,
   },
   actionSubtitle: {
     fontSize: 12,
@@ -179,6 +180,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -228,6 +230,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 4,
+    marginTop: 20,
   },
   getStartedSubtitle: {
     fontSize: 14,

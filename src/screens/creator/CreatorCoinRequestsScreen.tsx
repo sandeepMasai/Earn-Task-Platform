@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

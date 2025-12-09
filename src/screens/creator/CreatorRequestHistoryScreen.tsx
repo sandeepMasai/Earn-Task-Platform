@@ -152,10 +152,10 @@ const CreatorRequestHistoryScreen: React.FC = () => {
             <Text style={styles.detailValue}>
               {history.requestedAt
                 ? new Date(history.requestedAt).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
                 : 'N/A'}
             </Text>
           </View>
@@ -301,6 +301,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,
@@ -308,6 +309,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,
@@ -340,6 +342,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   statusBadge: {
     paddingHorizontal: 20,
@@ -358,6 +361,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
   },
   detailRow: {
     flexDirection: 'row',

@@ -180,8 +180,8 @@ const AdminUserDetailsScreen: React.FC = () => {
                         withdrawal.status === 'approved'
                           ? '#34C75920'
                           : withdrawal.status === 'rejected'
-                          ? '#FF3B3020'
-                          : '#FF950020',
+                            ? '#FF3B3020'
+                            : '#FF950020',
                     },
                   ]}
                 >
@@ -193,8 +193,8 @@ const AdminUserDetailsScreen: React.FC = () => {
                           withdrawal.status === 'approved'
                             ? '#34C759'
                             : withdrawal.status === 'rejected'
-                            ? '#FF3B30'
-                            : '#FF9500',
+                              ? '#FF3B30'
+                              : '#FF9500',
                       },
                     ]}
                   >
@@ -348,6 +348,7 @@ const styles = StyleSheet.create({
   blockButtonText: {
     fontSize: 16,
     fontWeight: '600',
+
   },
   section: {
     marginTop: 20,
@@ -358,6 +359,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 15,
+    marginTop: 20,
   },
   withdrawalCard: {
     backgroundColor: '#FFFFFF',

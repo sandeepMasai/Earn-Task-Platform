@@ -170,6 +170,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 4,
+    marginTop: 20,
   },
   subtitle: {
     fontSize: 14,

@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

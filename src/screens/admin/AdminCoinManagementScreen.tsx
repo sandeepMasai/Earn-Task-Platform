@@ -107,13 +107,13 @@ const AdminCoinManagementScreen: React.FC = () => {
                 }));
 
               await adminService.updateCoinConfigs(configsToUpdate);
-              
+
               Toast.show({
                 type: 'success',
                 text1: 'Success',
                 text2: 'Coin values updated successfully',
               });
-              
+
               // Reload configs to get updated data
               await loadConfigs();
             } catch (error: any) {
@@ -291,6 +291,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,
@@ -298,6 +299,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

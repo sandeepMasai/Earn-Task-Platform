@@ -144,6 +144,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#000000',
+    marginTop: 20,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -194,6 +195,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginLeft: 8,
+    marginTop: 20,
   },
   referralCode: {
     fontSize: 28,
@@ -220,6 +222,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
+    marginTop: 20,
   },
   referralCard: {
     flexDirection: 'row',

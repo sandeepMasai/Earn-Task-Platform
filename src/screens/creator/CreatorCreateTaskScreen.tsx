@@ -523,6 +523,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,
@@ -611,6 +612,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
   },
   typeSelector: {
     marginBottom: 16,

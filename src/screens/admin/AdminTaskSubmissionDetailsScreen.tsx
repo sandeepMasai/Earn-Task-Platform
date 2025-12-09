@@ -191,10 +191,10 @@ const AdminTaskSubmissionDetailsScreen: React.FC = () => {
                 {submission.task.type === 'instagram_follow'
                   ? 'Instagram Follow'
                   : submission.task.type === 'instagram_like'
-                  ? 'Instagram Like'
-                  : submission.task.type === 'youtube_subscribe'
-                  ? 'YouTube Subscribe'
-                  : submission.task.type}
+                    ? 'Instagram Like'
+                    : submission.task.type === 'youtube_subscribe'
+                      ? 'YouTube Subscribe'
+                      : submission.task.type}
               </Text>
             </View>
             <View style={styles.infoRow}>
@@ -237,8 +237,8 @@ const AdminTaskSubmissionDetailsScreen: React.FC = () => {
                     submission.status === 'pending'
                       ? 'time-outline'
                       : submission.status === 'approved'
-                      ? 'checkmark-circle'
-                      : 'close-circle'
+                        ? 'checkmark-circle'
+                        : 'close-circle'
                   }
                   size={16}
                   color={getStatusColor(submission.status)}
@@ -388,6 +388,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,
@@ -407,6 +408,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',

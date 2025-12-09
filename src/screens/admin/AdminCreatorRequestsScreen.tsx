@@ -213,11 +213,11 @@ const AdminCreatorRequestsScreen: React.FC = () => {
         ) : (
           <View style={styles.statusInfo}>
             <Text style={styles.statusInfoText}>
-              {item.status === 'approved' 
-                ? '✅ Approved' 
+              {item.status === 'approved'
+                ? '✅ Approved'
                 : item.status === 'rejected'
-                ? '❌ Rejected'
-                : '⏳ Pending'}
+                  ? '❌ Rejected'
+                  : '⏳ Pending'}
             </Text>
           </View>
         )}
@@ -346,6 +346,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,
@@ -353,6 +354,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

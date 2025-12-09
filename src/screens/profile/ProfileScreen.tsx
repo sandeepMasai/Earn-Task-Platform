@@ -70,7 +70,7 @@ const ProfileScreen: React.FC = () => {
     try {
       const telegramUrl = SUPPORT_CHANNELS.TELEGRAM;
       const canOpen = await Linking.canOpenURL(telegramUrl);
-      
+
       if (canOpen) {
         await Linking.openURL(telegramUrl);
       } else {
@@ -91,7 +91,7 @@ const ProfileScreen: React.FC = () => {
     try {
       const whatsappUrl = SUPPORT_CHANNELS.WHATSAPP;
       const canOpen = await Linking.canOpenURL(whatsappUrl);
-      
+
       if (canOpen) {
         await Linking.openURL(whatsappUrl);
       } else {
@@ -146,13 +146,13 @@ const ProfileScreen: React.FC = () => {
     },
     ...(user?.role === 'admin'
       ? [
-          {
-            icon: 'shield-outline',
-            title: 'Admin Dashboard',
-            onPress: () => navigation.navigate(ROUTES.ADMIN_DASHBOARD),
-            color: '#007AFF',
-          },
-        ]
+        {
+          icon: 'shield-outline',
+          title: 'Admin Dashboard',
+          onPress: () => navigation.navigate(ROUTES.ADMIN_DASHBOARD),
+          color: '#007AFF',
+        },
+      ]
       : []),
     {
       icon: 'settings-outline',
@@ -165,6 +165,11 @@ const ProfileScreen: React.FC = () => {
       onPress: handleHelpSupport,
     },
     {
+      icon: 'shield-checkmark-outline',
+      title: 'Privacy Policy',
+      onPress: () => navigation.navigate(ROUTES.PRIVACY_POLICY),
+    },
+    {
       icon: 'log-out-outline',
       title: 'Logout',
       onPress: handleLogout,
@@ -174,7 +179,7 @@ const ProfileScreen: React.FC = () => {
 
   // Creator menu items - show to all users
   const creatorMenuItems = [];
-  
+
   // Always show "Become a Creator" option to all users
   creatorMenuItems.push({
     icon: 'star-outline',
@@ -210,8 +215,8 @@ const ProfileScreen: React.FC = () => {
   const allMenuItems = [...menuItems, ...creatorMenuItems];
 
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -220,8 +225,8 @@ const ProfileScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
           {user?.avatar ? (
-            <Image 
-              source={{ uri: getAvatarUrl(user.avatar) || '' }} 
+            <Image
+              source={{ uri: getAvatarUrl(user.avatar) || '' }}
               style={styles.avatarImage}
             />
           ) : (
@@ -421,6 +426,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginLeft: 8,
+    marginTop: 20,
   },
   referralCode: {
     fontSize: 24,

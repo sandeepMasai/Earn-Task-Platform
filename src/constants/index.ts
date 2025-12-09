@@ -134,6 +134,7 @@ export const ROUTES = {
   EARNING_HISTORY: 'EarningHistory',
   REFERRALS: 'Referrals',
   EDIT_PROFILE: 'EditProfile',
+  PRIVACY_POLICY: 'PrivacyPolicy',
 
   // Feed
   COMMENTS: 'Comments',

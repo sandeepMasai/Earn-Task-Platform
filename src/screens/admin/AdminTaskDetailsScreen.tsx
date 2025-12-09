@@ -296,6 +296,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,
@@ -303,10 +304,12 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   headerActions: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 20,
   },
   actionButton: {
     padding: 4,
@@ -372,6 +375,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 8,
+    marginTop: 20,
   },
   taskDescription: {
     fontSize: 14,
@@ -417,6 +421,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -444,6 +449,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   completionCard: {
     backgroundColor: '#FFFFFF',

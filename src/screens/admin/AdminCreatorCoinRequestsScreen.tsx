@@ -163,18 +163,18 @@ const AdminCreatorCoinRequestsScreen: React.FC = () => {
   const getProofImageUrl = (path: string) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    
+
     // Handle absolute file paths (like /Users/.../uploads/filename.jpg)
     if (path.includes('/uploads/')) {
       const fileName = path.split('/uploads/')[1];
       return `${API_BASE_URL.replace('/api', '')}/uploads/${fileName}`;
     }
-    
+
     // Handle relative paths
     if (path.startsWith('/')) {
       return `${API_BASE_URL.replace('/api', '')}${path}`;
     }
-    
+
     // Default: assume it's in uploads folder
     return `${API_BASE_URL.replace('/api', '')}/uploads/${path}`;
   };
@@ -241,8 +241,8 @@ const AdminCreatorCoinRequestsScreen: React.FC = () => {
                 <Text style={styles.pdfHint}>Tap to open payment proof PDF</Text>
               </TouchableOpacity>
             ) : (
-              <Image 
-                source={{ uri: proofUrl }} 
+              <Image
+                source={{ uri: proofUrl }}
                 style={styles.proofImage}
                 resizeMode="contain"
                 onError={(error) => {
@@ -325,11 +325,11 @@ const AdminCreatorCoinRequestsScreen: React.FC = () => {
         ) : (
           <View style={styles.statusInfo}>
             <Text style={styles.statusInfoText}>
-              {item.status === 'approved' 
-                ? '✅ Approved' 
+              {item.status === 'approved'
+                ? '✅ Approved'
                 : item.status === 'rejected'
-                ? '❌ Rejected'
-                : '⏳ Pending'}
+                  ? '❌ Rejected'
+                  : '⏳ Pending'}
             </Text>
             {item.status === 'approved' && (
               <Text style={styles.statusSubText}>
@@ -468,6 +468,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,
@@ -475,6 +476,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     flex: 1,
     marginLeft: 12,
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

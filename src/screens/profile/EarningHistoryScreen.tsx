@@ -21,7 +21,7 @@ const EarningHistoryScreen: React.FC = () => {
     try {
       const data = await walletService.getTransactions();
       // Filter only earned transactions
-      const earned = data.filter((t: any) => 
+      const earned = data.filter((t: any) =>
         t.type === 'earned' || t.type === 'referral' || t.type === 'bonus'
       );
       // Transform _id to id if needed
@@ -157,6 +157,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
   },
   totalContainer: {
     backgroundColor: '#F5F5F5',

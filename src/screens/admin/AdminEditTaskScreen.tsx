@@ -51,7 +51,7 @@ const AdminEditTaskScreen: React.FC = () => {
     try {
       setIsLoadingTask(true);
       const task = await adminTaskService.getTaskById(taskId);
-      
+
       setType(task.type);
       setTitle(task.title);
       setDescription(task.description);
@@ -406,6 +406,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
+    marginTop: 20,
   },
   placeholder: {
     width: 32,

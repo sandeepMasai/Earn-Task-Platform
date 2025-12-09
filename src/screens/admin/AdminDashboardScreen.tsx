@@ -66,7 +66,6 @@ const AdminDashboardScreen: React.FC = () => {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Admin Dashboard</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
@@ -304,8 +303,8 @@ const AdminDashboardScreen: React.FC = () => {
                             withdrawal.status === 'approved'
                               ? '#34C75920'
                               : withdrawal.status === 'rejected'
-                              ? '#FF3B3020'
-                              : '#FF950020',
+                                ? '#FF3B3020'
+                                : '#FF950020',
                         },
                       ]}
                     >
@@ -317,8 +316,8 @@ const AdminDashboardScreen: React.FC = () => {
                               withdrawal.status === 'approved'
                                 ? '#34C759'
                                 : withdrawal.status === 'rejected'
-                                ? '#FF3B30'
-                                : '#FF9500',
+                                  ? '#FF3B30'
+                                  : '#FF9500',
                           },
                         ]}
                       >
@@ -402,10 +401,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#000000',
+    marginTop: 20,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 20,
   },
   headerButton: {
     padding: 8,
@@ -425,6 +425,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 15,
+    marginTop: 20,
   },
   viewAll: {
     fontSize: 14,

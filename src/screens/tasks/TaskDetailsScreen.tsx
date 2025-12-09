@@ -422,13 +422,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
+
   },
   title: {
+
     fontSize: 24,
     fontWeight: 'bold',
     color: '#000000',
     flex: 1,
     marginRight: 8,
+    marginTop: 20,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -476,6 +479,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     marginBottom: 12,
+    marginTop: 20,
   },
   instructions: {
     marginBottom: 16,

@@ -129,6 +129,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 16,
+    marginTop: 20,
     textAlign: 'center',
   },
   description: {

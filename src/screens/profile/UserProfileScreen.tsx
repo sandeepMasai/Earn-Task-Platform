@@ -40,7 +40,7 @@ const UserProfileScreen: React.FC = () => {
   const loadUserProfile = async () => {
     try {
       setIsLoading(true);
-      
+
       // Get user data
       const userData = await userService.getUserById(userId);
       setUser(userData);
@@ -193,8 +193,8 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             {user?.avatar ? (
-              <Image 
-                source={{ uri: getAvatarUrl(user.avatar) || '' }} 
+              <Image
+                source={{ uri: getAvatarUrl(user.avatar) || '' }}
                 style={styles.avatarImage}
               />
             ) : (
@@ -289,6 +289,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
+    marginTop: 20,
   },
   placeholder: {
     width: 32,
@@ -380,6 +381,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     paddingHorizontal: 16,
     marginBottom: 16,
+    marginTop: 20,
   },
   postsList: {
     flex: 1,

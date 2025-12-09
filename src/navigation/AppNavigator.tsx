@@ -40,6 +40,7 @@ import WithdrawalHistoryScreen from '@screens/profile/WithdrawalHistoryScreen';
 import EarningHistoryScreen from '@screens/profile/EarningHistoryScreen';
 import ReferralsScreen from '@screens/profile/ReferralsScreen';
 import EditProfileScreen from '@screens/profile/EditProfileScreen';
+import PrivacyPolicyScreen from '@screens/profile/PrivacyPolicyScreen';
 
 // Feed Screens
 import CommentsScreen from '@screens/feed/CommentsScreen';
@@ -190,6 +191,11 @@ const AppNavigator: React.FC = () => {
                         <Stack.Screen
                             name={ROUTES.EDIT_PROFILE}
                             component={EditProfileScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.PRIVACY_POLICY}
+                            component={PrivacyPolicyScreen}
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen

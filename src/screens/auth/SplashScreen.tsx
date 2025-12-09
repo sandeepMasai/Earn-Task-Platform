@@ -30,7 +30,7 @@ const SplashScreen: React.FC = () => {
       const navigateToScreen = async () => {
         // Wait a bit for navigation to be ready
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         try {
           if (isAuthenticated) {
             navigation.replace('MainTabs');
@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 8,
+    marginTop: 20,
   },
   subtitle: {
     fontSize: 16,

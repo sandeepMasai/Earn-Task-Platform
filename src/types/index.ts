@@ -273,6 +273,7 @@ export type RootStackParamList = {
     EarningHistory: undefined;
     Referrals: undefined;
     EditProfile: undefined;
+    PrivacyPolicy: undefined;
     Comments: { postId: string };
     EditPost: { postId: string; currentCaption: string };
     UserProfile: { userId: string };

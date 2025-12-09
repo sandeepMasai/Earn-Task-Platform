@@ -6,7 +6,7 @@ const {
   viewStory,
 } = require('../controllers/storyController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 
 router.get('/', protect, getStories);
 router.post('/', protect, upload.single('media'), uploadStory);

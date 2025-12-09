@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { creatorService } from '@services/creatorService';
 import { useAppSelector, useAppDispatch } from '@store/hooks';
 import { refreshUser } from '@store/slices/authSlice';
@@ -19,19 +19,25 @@ import Input from '@components/common/Input';
 import Button from '@components/common/Button';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
+import LoadingSpinner from '@components/common/LoadingSpinner';
 
 const TASK_TYPES = [
   { value: 'watch_video', label: 'Watch Video' },
   { value: 'instagram_follow', label: 'Instagram Follow' },
   { value: 'instagram_like', label: 'Instagram Like' },
   { value: 'youtube_subscribe', label: 'YouTube Subscribe' },
-  { value: 'upload_post', label: 'Upload Post' },
+  // { value: 'upload_post', label: 'Upload Post' },
 ];
 
 const CreatorCreateTaskScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const taskId = route.params?.taskId;
+  const existingTask = route.params?.task;
+  const isEditMode = !!taskId;
+
   const [type, setType] = useState<string>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -42,6 +48,7 @@ const CreatorCreateTaskScreen: React.FC = () => {
   const [instagramUrl, setInstagramUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [creatorWallet, setCreatorWallet] = useState<number>(0);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
 
@@ -72,7 +79,51 @@ const CreatorCreateTaskScreen: React.FC = () => {
   // Also load on mount
   useEffect(() => {
     loadWalletBalance();
+    if (isEditMode && existingTask) {
+      loadTaskData(existingTask);
+    } else if (isEditMode && taskId) {
+      loadTaskById();
+    }
   }, []);
+
+  const loadTaskData = (task: any) => {
+    setType(task.type || '');
+    setTitle(task.title || '');
+    setDescription(task.description || '');
+    setRewardPerUser(task.rewardPerUser?.toString() || '');
+    setMaxUsers(task.maxUsers?.toString() || '');
+    setVideoUrl(task.videoUrl || '');
+    setVideoDuration(task.videoDuration?.toString() || '');
+    setInstagramUrl(task.instagramUrl || '');
+    setYoutubeUrl(task.youtubeUrl || '');
+  };
+
+  const loadTaskById = async () => {
+    setIsLoadingTask(true);
+    try {
+      const tasks = await creatorService.getCreatorTasks();
+      const task = tasks.find((t) => t.id === taskId);
+      if (task) {
+        loadTaskData(task);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Task not found',
+        });
+        navigation.goBack();
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to load task',
+      });
+      navigation.goBack();
+    } finally {
+      setIsLoadingTask(false);
+    }
+  };
   const rewardValue = parseInt(rewardPerUser) || 0;
   const maxUsersValue = parseInt(maxUsers) || 0;
   const totalCost = rewardValue * maxUsersValue;
@@ -124,7 +175,8 @@ const CreatorCreateTaskScreen: React.FC = () => {
       return false;
     }
 
-    if (!canAfford) {
+    // Only check affordability for new tasks, not when editing
+    if (!isEditMode && !canAfford) {
       Toast.show({
         type: 'error',
         text1: 'Insufficient Balance',
@@ -167,55 +219,91 @@ const CreatorCreateTaskScreen: React.FC = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    Alert.alert(
-      'Confirm Task Creation',
-      `This will deduct ${formatCoins(totalCost)} from your creator wallet.\n\nReward: ${formatCoins(rewardValue)} per user\nMax Users: ${maxUsersValue}\n\nContinue?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const taskData: any = {
-                type,
-                title: title.trim(),
-                description: description.trim(),
-                rewardPerUser: rewardValue,
-                maxUsers: maxUsersValue,
-              };
+    if (isEditMode) {
+      // Edit mode - update existing task
+      setIsLoading(true);
+      try {
+        const taskData: any = {
+          type,
+          title: title.trim(),
+          description: description.trim(),
+          rewardPerUser: rewardValue,
+          maxUsers: maxUsersValue,
+        };
 
-              if (videoUrl.trim()) taskData.videoUrl = videoUrl.trim();
-              if (videoDuration) taskData.videoDuration = parseInt(videoDuration);
-              if (instagramUrl.trim()) taskData.instagramUrl = instagramUrl.trim();
-              if (youtubeUrl.trim()) taskData.youtubeUrl = youtubeUrl.trim();
+        if (videoUrl.trim()) taskData.videoUrl = videoUrl.trim();
+        if (videoDuration) taskData.videoDuration = parseInt(videoDuration);
+        if (instagramUrl.trim()) taskData.instagramUrl = instagramUrl.trim();
+        if (youtubeUrl.trim()) taskData.youtubeUrl = youtubeUrl.trim();
 
-              const response = await creatorService.createTask(taskData);
-              // Update wallet balance from response
-              if (response.creatorWallet !== undefined) {
-                setCreatorWallet(response.creatorWallet);
+        await creatorService.updateTask(taskId, taskData);
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Task updated successfully!',
+        });
+        navigation.goBack();
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.message || 'Failed to update task',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Create mode - create new task
+      Alert.alert(
+        'Confirm Task Creation',
+        `This will deduct ${formatCoins(totalCost)} from your creator wallet.\n\nReward: ${formatCoins(rewardValue)} per user\nMax Users: ${maxUsersValue}\n\nContinue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Create',
+            onPress: async () => {
+              setIsLoading(true);
+              try {
+                const taskData: any = {
+                  type,
+                  title: title.trim(),
+                  description: description.trim(),
+                  rewardPerUser: rewardValue,
+                  maxUsers: maxUsersValue,
+                };
+
+                if (videoUrl.trim()) taskData.videoUrl = videoUrl.trim();
+                if (videoDuration) taskData.videoDuration = parseInt(videoDuration);
+                if (instagramUrl.trim()) taskData.instagramUrl = instagramUrl.trim();
+                if (youtubeUrl.trim()) taskData.youtubeUrl = youtubeUrl.trim();
+
+                const response = await creatorService.createTask(taskData);
+                // Update wallet balance from response
+                if (response.creatorWallet !== undefined) {
+                  setCreatorWallet(response.creatorWallet);
+                }
+                // Refresh user data
+                await dispatch(refreshUser());
+                Toast.show({
+                  type: 'success',
+                  text1: 'Success',
+                  text2: 'Task created successfully!',
+                });
+                navigation.goBack();
+              } catch (error: any) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: error.message || 'Failed to create task',
+                });
+              } finally {
+                setIsLoading(false);
               }
-              // Refresh user data
-              await dispatch(refreshUser());
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Task created successfully!',
-              });
-              navigation.goBack();
-            } catch (error: any) {
-              Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: error.message || 'Failed to create task',
-              });
-            } finally {
-              setIsLoading(false);
-            }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   return (
@@ -230,176 +318,182 @@ const CreatorCreateTaskScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>
-        <Text style={styles.title}>Create Task</Text>
+        <Text style={styles.title}>{isEditMode ? 'Edit Task' : 'Create Task'}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {/* Wallet Info */}
-        <View style={styles.walletCard}>
-          <Text style={styles.walletLabel}>Creator Wallet</Text>
-          {isLoadingWallet ? (
-            <Text style={styles.walletAmount}>Loading...</Text>
-          ) : (
-            <Text style={styles.walletAmount}>{formatCoins(creatorWallet)}</Text>
-          )}
-        </View>
-
-        {/* Budget Calculator */}
-        {rewardValue > 0 && maxUsersValue > 0 && (
-          <View style={styles.budgetCard}>
-            <Text style={styles.budgetTitle}>Budget Calculation</Text>
-            <View style={styles.budgetRow}>
-              <Text style={styles.budgetLabel}>Reward per user:</Text>
-              <Text style={styles.budgetValue}>{formatCoins(rewardValue)}</Text>
+        {isLoadingTask ? (
+          <LoadingSpinner />
+        ) : (
+          <>
+            {/* Wallet Info */}
+            <View style={styles.walletCard}>
+              <Text style={styles.walletLabel}>Creator Wallet</Text>
+              {isLoadingWallet ? (
+                <Text style={styles.walletAmount}>Loading...</Text>
+              ) : (
+                <Text style={styles.walletAmount}>{formatCoins(creatorWallet)}</Text>
+              )}
             </View>
-            <View style={styles.budgetRow}>
-              <Text style={styles.budgetLabel}>Max users:</Text>
-              <Text style={styles.budgetValue}>{maxUsersValue}</Text>
-            </View>
-            <View style={styles.budgetDivider} />
-            <View style={styles.budgetRow}>
-              <Text style={styles.budgetTotalLabel}>Total Cost:</Text>
-              <Text
-                style={[
-                  styles.budgetTotalValue,
-                  { color: canAfford ? '#34C759' : '#FF3B30' },
-                ]}
-              >
-                {formatCoins(totalCost)}
-              </Text>
-            </View>
-            {!canAfford && (
-              <Text style={styles.insufficientText}>
-                Insufficient balance. You need {formatCoins(totalCost - creatorWallet)} more.
-              </Text>
-            )}
-          </View>
-        )}
 
-        <View style={styles.form}>
-          <Text style={styles.sectionTitle}>Task Details</Text>
-
-          <View style={styles.typeSelector}>
-            <Text style={styles.label}>Task Type *</Text>
-            <View style={styles.typeGrid}>
-              {TASK_TYPES.map((taskType) => (
-                <TouchableOpacity
-                  key={taskType.value}
-                  style={[
-                    styles.typeButton,
-                    type === taskType.value && styles.typeButtonActive,
-                  ]}
-                  onPress={() => setType(taskType.value)}
-                >
+            {/* Budget Calculator - Only show for new tasks */}
+            {!isEditMode && rewardValue > 0 && maxUsersValue > 0 && (
+              <View style={styles.budgetCard}>
+                <Text style={styles.budgetTitle}>Budget Calculation</Text>
+                <View style={styles.budgetRow}>
+                  <Text style={styles.budgetLabel}>Reward per user:</Text>
+                  <Text style={styles.budgetValue}>{formatCoins(rewardValue)}</Text>
+                </View>
+                <View style={styles.budgetRow}>
+                  <Text style={styles.budgetLabel}>Max users:</Text>
+                  <Text style={styles.budgetValue}>{maxUsersValue}</Text>
+                </View>
+                <View style={styles.budgetDivider} />
+                <View style={styles.budgetRow}>
+                  <Text style={styles.budgetTotalLabel}>Total Cost:</Text>
                   <Text
                     style={[
-                      styles.typeButtonText,
-                      type === taskType.value && styles.typeButtonTextActive,
+                      styles.budgetTotalValue,
+                      { color: canAfford ? '#34C759' : '#FF3B30' },
                     ]}
                   >
-                    {taskType.label}
+                    {formatCoins(totalCost)}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+                </View>
+                {!canAfford && (
+                  <Text style={styles.insufficientText}>
+                    Insufficient balance. You need {formatCoins(totalCost - creatorWallet)} more.
+                  </Text>
+                )}
+              </View>
+            )}
 
-          <Input
-            label="Title *"
-            placeholder="Enter task title"
-            value={title}
-            onChangeText={setTitle}
-            containerStyle={styles.input}
-          />
+            <View style={styles.form}>
+              <Text style={styles.sectionTitle}>Task Details</Text>
 
-          <Input
-            label="Description *"
-            placeholder="Enter task description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            containerStyle={styles.input}
-          />
+              <View style={styles.typeSelector}>
+                <Text style={styles.label}>Task Type *</Text>
+                <View style={styles.typeGrid}>
+                  {TASK_TYPES.map((taskType) => (
+                    <TouchableOpacity
+                      key={taskType.value}
+                      style={[
+                        styles.typeButton,
+                        type === taskType.value && styles.typeButtonActive,
+                      ]}
+                      onPress={() => setType(taskType.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          type === taskType.value && styles.typeButtonTextActive,
+                        ]}
+                      >
+                        {taskType.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-          <View style={styles.rewardRow}>
-            <View style={styles.rewardInput}>
               <Input
-                label="Reward per User *"
-                placeholder="Coins"
-                value={rewardPerUser}
-                onChangeText={(text) => setRewardPerUser(text.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
+                label="Title *"
+                placeholder="Enter task title"
+                value={title}
+                onChangeText={setTitle}
                 containerStyle={styles.input}
+              />
+
+              <Input
+                label="Description *"
+                placeholder="Enter task description"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={4}
+                containerStyle={styles.input}
+              />
+
+              <View style={styles.rewardRow}>
+                <View style={styles.rewardInput}>
+                  <Input
+                    label="Reward per User *"
+                    placeholder="Coins"
+                    value={rewardPerUser}
+                    onChangeText={(text) => setRewardPerUser(text.replace(/[^0-9]/g, ''))}
+                    keyboardType="numeric"
+                    containerStyle={styles.input}
+                  />
+                </View>
+                <View style={styles.rewardInput}>
+                  <Input
+                    label="Max Users *"
+                    placeholder="Count"
+                    value={maxUsers}
+                    onChangeText={(text) => setMaxUsers(text.replace(/[^0-9]/g, ''))}
+                    keyboardType="numeric"
+                    containerStyle={styles.input}
+                  />
+                </View>
+              </View>
+
+              {type === 'watch_video' && (
+                <>
+                  <Input
+                    label="Video URL *"
+                    placeholder="https://..."
+                    value={videoUrl}
+                    onChangeText={setVideoUrl}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    containerStyle={styles.input}
+                  />
+                  <Input
+                    label="Video Duration (seconds)"
+                    placeholder="60"
+                    value={videoDuration}
+                    onChangeText={(text) => setVideoDuration(text.replace(/[^0-9]/g, ''))}
+                    keyboardType="numeric"
+                    containerStyle={styles.input}
+                  />
+                </>
+              )}
+
+              {(type === 'instagram_follow' || type === 'instagram_like') && (
+                <Input
+                  label="Instagram URL *"
+                  placeholder="https://instagram.com/..."
+                  value={instagramUrl}
+                  onChangeText={setInstagramUrl}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  containerStyle={styles.input}
+                />
+              )}
+
+              {type === 'youtube_subscribe' && (
+                <Input
+                  label="YouTube URL *"
+                  placeholder="https://youtube.com/..."
+                  value={youtubeUrl}
+                  onChangeText={setYoutubeUrl}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  containerStyle={styles.input}
+                />
+              )}
+
+              <Button
+                title={isEditMode ? 'Update Task' : 'Create Task'}
+                onPress={handleSubmit}
+                loading={isLoading}
+                disabled={!isEditMode && !canAfford}
+                style={styles.submitButton}
               />
             </View>
-            <View style={styles.rewardInput}>
-              <Input
-                label="Max Users *"
-                placeholder="Count"
-                value={maxUsers}
-                onChangeText={(text) => setMaxUsers(text.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-                containerStyle={styles.input}
-              />
-            </View>
-          </View>
-
-          {type === 'watch_video' && (
-            <>
-              <Input
-                label="Video URL *"
-                placeholder="https://..."
-                value={videoUrl}
-                onChangeText={setVideoUrl}
-                autoCapitalize="none"
-                keyboardType="url"
-                containerStyle={styles.input}
-              />
-              <Input
-                label="Video Duration (seconds)"
-                placeholder="60"
-                value={videoDuration}
-                onChangeText={(text) => setVideoDuration(text.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-                containerStyle={styles.input}
-              />
-            </>
-          )}
-
-          {(type === 'instagram_follow' || type === 'instagram_like') && (
-            <Input
-              label="Instagram URL *"
-              placeholder="https://instagram.com/..."
-              value={instagramUrl}
-              onChangeText={setInstagramUrl}
-              autoCapitalize="none"
-              keyboardType="url"
-              containerStyle={styles.input}
-            />
-          )}
-
-          {type === 'youtube_subscribe' && (
-            <Input
-              label="YouTube URL *"
-              placeholder="https://youtube.com/..."
-              value={youtubeUrl}
-              onChangeText={setYoutubeUrl}
-              autoCapitalize="none"
-              keyboardType="url"
-              containerStyle={styles.input}
-            />
-          )}
-
-          <Button
-            title="Create Task"
-            onPress={handleSubmit}
-            loading={isLoading}
-            disabled={!canAfford}
-            style={styles.submitButton}
-          />
-        </View>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -3,6 +3,7 @@ const Task = require('../models/Task');
 const CreatorCoinRequest = require('../models/CreatorCoinRequest');
 const TaskSubmission = require('../models/TaskSubmission');
 const Transaction = require('../models/Transaction');
+const { getFileUrl } = require('../middleware/upload');
 
 // @desc    Register as creator
 // @route   POST /api/creator/register
@@ -197,12 +198,21 @@ exports.requestCoins = async (req, res) => {
     // Calculate amount (1000 coins = 10 rupees)
     const amount = (coins / 100).toFixed(2);
 
+    // Get file URL from Cloudinary or local storage
+    const paymentProofUrl = getFileUrl(req.file);
+    if (!paymentProofUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to process payment proof image',
+      });
+    }
+
     // Create coin request
     const coinRequest = await CreatorCoinRequest.create({
       creator: req.user._id,
       coins,
       amount,
-      paymentProof: req.file.path,
+      paymentProof: paymentProofUrl,
       status: 'pending',
     });
 
@@ -250,10 +260,10 @@ exports.getCoinRequests = async (req, res) => {
       rejectionReason: req.rejectionReason,
       reviewedBy: req.reviewedBy
         ? {
-            id: req.reviewedBy._id,
-            name: req.reviewedBy.name,
-            username: req.reviewedBy.username,
-          }
+          id: req.reviewedBy._id,
+          name: req.reviewedBy.name,
+          username: req.reviewedBy.username,
+        }
         : null,
       reviewedAt: req.reviewedAt,
       requestedAt: req.createdAt,
@@ -433,6 +443,251 @@ exports.createTask = async (req, res) => {
   }
 };
 
+// @desc    Get all tasks created by the creator
+// @route   GET /api/creator/tasks
+// @access  Private/Creator
+exports.getCreatorTasks = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!user.isCreator || user.creatorStatus !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not an approved creator',
+      });
+    }
+
+    // Get all tasks created by this creator
+    const tasks = await Task.find({ createdBy: req.user._id, isCreatorTask: true })
+      .sort({ createdAt: -1 }); // Newest first
+
+    // Calculate completions for each task
+    const tasksWithStats = await Promise.all(
+      tasks.map(async (task) => {
+        const completions = await TaskSubmission.countDocuments({
+          task: task._id,
+          status: 'approved',
+        });
+
+        return {
+          id: task._id,
+          _id: task._id,
+          type: task.type,
+          title: task.title,
+          description: task.description,
+          coins: task.rewardPerUser || task.coins || 0, // For compatibility
+          rewardPerUser: task.rewardPerUser,
+          maxUsers: task.maxUsers,
+          coinsUsed: task.coinsUsed || 0,
+          totalBudget: task.totalBudget,
+          videoUrl: task.videoUrl,
+          videoDuration: task.videoDuration,
+          instagramUrl: task.instagramUrl,
+          youtubeUrl: task.youtubeUrl,
+          thumbnail: task.thumbnail,
+          createdAt: task.createdAt,
+          isActive: task.isActive,
+          completions: completions,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: tasksWithStats,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update creator task
+// @route   PUT /api/creator/tasks/:id
+// @access  Private/Creator
+exports.updateCreatorTask = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!user.isCreator || user.creatorStatus !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not an approved creator',
+      });
+    }
+
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found',
+      });
+    }
+
+    // Check if task belongs to this creator
+    if (task.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only update your own tasks',
+      });
+    }
+
+    // Update allowed fields
+    const {
+      type,
+      title,
+      description,
+      rewardPerUser,
+      maxUsers,
+      videoUrl,
+      videoDuration,
+      instagramUrl,
+      youtubeUrl,
+      thumbnail,
+    } = req.body;
+
+    if (type) task.type = type;
+    if (title) task.title = title;
+    if (description) task.description = description;
+    if (videoUrl !== undefined) task.videoUrl = videoUrl;
+    if (videoDuration !== undefined) task.videoDuration = videoDuration;
+    if (instagramUrl !== undefined) task.instagramUrl = instagramUrl;
+    if (youtubeUrl !== undefined) task.youtubeUrl = youtubeUrl;
+    if (thumbnail !== undefined) task.thumbnail = thumbnail;
+
+    // If rewardPerUser or maxUsers changed, recalculate budget
+    if (rewardPerUser !== undefined || maxUsers !== undefined) {
+      const newRewardPerUser = rewardPerUser !== undefined ? parseInt(rewardPerUser) : task.rewardPerUser;
+      const newMaxUsers = maxUsers !== undefined ? parseInt(maxUsers) : task.maxUsers;
+
+      if (isNaN(newRewardPerUser) || newRewardPerUser <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Reward per user must be a positive number',
+        });
+      }
+
+      if (isNaN(newMaxUsers) || newMaxUsers <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Max users must be a positive number',
+        });
+      }
+
+      task.rewardPerUser = newRewardPerUser;
+      task.maxUsers = newMaxUsers;
+      task.totalBudget = newRewardPerUser * newMaxUsers;
+
+      // Check if new budget is less than coins already used
+      if (task.coinsUsed > task.totalBudget) {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot reduce budget below coins already used (${task.coinsUsed} coins)`,
+        });
+      }
+    }
+
+    await task.save();
+
+    res.json({
+      success: true,
+      message: 'Task updated successfully',
+      data: {
+        task: task,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete creator task
+// @route   DELETE /api/creator/tasks/:id
+// @access  Private/Creator
+exports.deleteCreatorTask = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!user.isCreator || user.creatorStatus !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not an approved creator',
+      });
+    }
+
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found',
+      });
+    }
+
+    // Check if task belongs to this creator
+    if (task.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only delete your own tasks',
+      });
+    }
+
+    // Calculate refund (unused coins)
+    const refundedCoins = (task.totalBudget || 0) - (task.coinsUsed || 0);
+
+    // Refund unused coins to creator wallet
+    if (refundedCoins > 0) {
+      user.creatorWallet = (user.creatorWallet || 0) + refundedCoins;
+      await user.save();
+    }
+
+    // Delete task submissions related to this task
+    await TaskSubmission.deleteMany({ task: task._id });
+
+    // Delete the task
+    await Task.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Task deleted successfully',
+      data: {
+        refundedCoins: refundedCoins > 0 ? refundedCoins : 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 // @desc    Get creator request history
 // @route   GET /api/creator/request-history
@@ -456,10 +711,10 @@ exports.getCreatorRequestHistory = async (req, res) => {
         creatorStatus: user.creatorStatus,
         creatorApprovedBy: user.creatorApprovedBy
           ? {
-              id: user.creatorApprovedBy._id,
-              name: user.creatorApprovedBy.name,
-              username: user.creatorApprovedBy.username,
-            }
+            id: user.creatorApprovedBy._id,
+            name: user.creatorApprovedBy.name,
+            username: user.creatorApprovedBy.username,
+          }
           : null,
         creatorApprovedAt: user.creatorApprovedAt,
         creatorYouTubeUrl: user.creatorYouTubeUrl,
@@ -490,7 +745,7 @@ exports.getTaskSubmissions = async (req, res) => {
     }
 
     const { status, taskId } = req.query;
-    
+
     // Get all tasks created by this creator
     const tasksQuery = { createdBy: req.user._id, isCreatorTask: true };
     if (taskId) {
@@ -614,10 +869,10 @@ exports.getTaskSubmissionById = async (req, res) => {
         rejectionReason: submission.rejectionReason,
         reviewedBy: submission.reviewedBy
           ? {
-              id: submission.reviewedBy._id,
-              name: submission.reviewedBy.name,
-              username: submission.reviewedBy.username,
-            }
+            id: submission.reviewedBy._id,
+            name: submission.reviewedBy.name,
+            username: submission.reviewedBy.username,
+          }
           : null,
         reviewedAt: submission.reviewedAt,
         submittedAt: submission.createdAt,

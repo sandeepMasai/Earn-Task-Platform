@@ -196,5 +196,51 @@ export const creatorService = {
     });
     return response.data;
   },
+
+  async getCreatorTasks(): Promise<Array<{
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    rewardPerUser: number;
+    maxUsers: number;
+    coinsUsed: number;
+    totalBudget: number;
+    videoUrl?: string;
+    videoDuration?: number;
+    instagramUrl?: string;
+    youtubeUrl?: string;
+    thumbnail?: string;
+    createdAt: string;
+    isActive: boolean;
+    completions: number;
+  }>> {
+    const response = await apiService.get('/creator/tasks');
+    return response.data.map((task: any) => ({
+      ...task,
+      id: task._id || task.id,
+    }));
+  },
+
+  async updateTask(taskId: string, taskData: {
+    type?: string;
+    title?: string;
+    description?: string;
+    rewardPerUser?: number;
+    maxUsers?: number;
+    videoUrl?: string;
+    videoDuration?: number;
+    instagramUrl?: string;
+    youtubeUrl?: string;
+    thumbnail?: string;
+  }): Promise<{ message: string; task: any }> {
+    const response = await apiService.put(`/creator/tasks/${taskId}`, taskData);
+    return response.data;
+  },
+
+  async deleteTask(taskId: string): Promise<{ message: string; refundedCoins?: number }> {
+    const response = await apiService.delete(`/creator/tasks/${taskId}`);
+    return response.data;
+  },
 };
 

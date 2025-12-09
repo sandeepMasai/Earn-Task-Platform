@@ -4,6 +4,8 @@ const Transaction = require('../models/Transaction');
 const { getCoinValue } = require('../utils/coinHelper');
 const fs = require('fs');
 const path = require('path');
+const { getFileUrl, useCloudinary } = require('../middleware/upload');
+const { deleteFromCloudinary } = require('../config/cloudinary');
 
 // @desc    Get feed
 // @route   GET /api/posts/feed
@@ -33,12 +35,12 @@ exports.getFeed = async (req, res) => {
             // The post owner's followers array contains users who follow them
             // But we need to check if current user is following the post owner
             // So we check if current user's ID is in the post owner's followers array
-            const isFollowing = postOwner && postOwner.followers 
+            const isFollowing = postOwner && postOwner.followers
               ? postOwner.followers.some(
-                  (id) => id.toString() === req.user._id.toString()
-                ) 
+                (id) => id.toString() === req.user._id.toString()
+              )
               : false;
-            
+
             return {
               id: post._id.toString(),
               userId: post.user._id.toString(),
@@ -87,21 +89,29 @@ exports.uploadPost = async (req, res) => {
       });
     }
 
-    const fileUrl = `/uploads/${file.filename}`;
-    const postType = type || (file.mimetype.startsWith('image/') ? 'image' : 
-                              file.mimetype.startsWith('video/') ? 'video' : 'document');
+    // Get file URL from Cloudinary or local storage
+    const fileUrl = getFileUrl(file);
+    if (!fileUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to process uploaded file',
+      });
+    }
+
+    const postType = type || (file.mimetype.startsWith('image/') ? 'image' :
+      file.mimetype.startsWith('video/') ? 'video' : 'document');
 
     // Validate video duration (10 seconds minimum, 2 minutes maximum = 120 seconds)
     if (postType === 'video' && videoDuration) {
       const duration = parseFloat(videoDuration);
-      
+
       if (duration < 10) {
         return res.status(400).json({
           success: false,
           error: 'Video duration must be at least 10 seconds',
         });
       }
-      
+
       if (duration > 120) {
         return res.status(400).json({
           success: false,
@@ -479,7 +489,6 @@ exports.deletePost = async (req, res) => {
     }
 
     // Delete associated files
-    const uploadsDir = path.join(__dirname, '../../uploads');
     const filesToDelete = [
       post.imageUrl,
       post.videoUrl,
@@ -487,18 +496,28 @@ exports.deletePost = async (req, res) => {
       post.thumbnailUrl,
     ].filter(Boolean);
 
-    filesToDelete.forEach((filePath) => {
-      if (filePath && filePath.startsWith('/uploads/')) {
-        const fileFullPath = path.join(__dirname, '../../', filePath);
+    for (const fileUrl of filesToDelete) {
+      if (!fileUrl) continue;
+
+      if (useCloudinary && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
+        // Delete from Cloudinary
+        try {
+          await deleteFromCloudinary(fileUrl);
+        } catch (error) {
+          console.error('Error deleting from Cloudinary:', error);
+        }
+      } else if (fileUrl.startsWith('/uploads/')) {
+        // Delete from local storage
+        const fileFullPath = path.join(__dirname, '../../', fileUrl);
         try {
           if (fs.existsSync(fileFullPath)) {
             fs.unlinkSync(fileFullPath);
           }
         } catch (fileError) {
-          console.error('Error deleting file:', fileError);
+          console.error('Error deleting local file:', fileError);
         }
       }
-    });
+    }
 
     await post.deleteOne();
 

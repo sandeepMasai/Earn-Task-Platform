@@ -101,8 +101,13 @@ const CreatorTaskSubmissionsScreen: React.FC = () => {
   };
 
   const getProofImageUrl = (imagePath: string) => {
-    if (imagePath.startsWith('http')) return imagePath;
-    return `${API_BASE_URL.replace('/api', '')}${imagePath}`;
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    // Handle relative paths
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
   };
 
   const renderSubmissionCard = ({ item }: { item: TaskSubmission }) => (
@@ -139,22 +144,28 @@ const CreatorTaskSubmissionsScreen: React.FC = () => {
           {item.task.type === 'instagram_follow'
             ? 'Instagram Follow'
             : item.task.type === 'instagram_like'
-            ? 'Instagram Like'
-            : item.task.type === 'youtube_subscribe'
-            ? 'YouTube Subscribe'
-            : item.task.type}
+              ? 'Instagram Like'
+              : item.task.type === 'youtube_subscribe'
+                ? 'YouTube Subscribe'
+                : item.task.type}
         </Text>
       </View>
 
-      <View style={styles.proofPreview}>
-        <Image
-          source={{ uri: getProofImageUrl(item.proofImage) }}
-          style={styles.proofThumbnail}
-        />
-        <View style={styles.proofOverlay}>
-          <Ionicons name="image" size={16} color="#FFFFFF" />
+      {getProofImageUrl(item.proofImage) && (
+        <View style={styles.proofPreview}>
+          <Image
+            source={{ uri: getProofImageUrl(item.proofImage)! }}
+            style={styles.proofThumbnail}
+            resizeMode="cover"
+            onError={(error) => {
+              console.log('Image load error:', error);
+            }}
+          />
+          <View style={styles.proofOverlay}>
+            <Ionicons name="image" size={16} color="#FFFFFF" />
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.cardFooter}>
         <View style={styles.footerItem}>

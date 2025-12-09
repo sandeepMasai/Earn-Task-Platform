@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,14 +33,19 @@ const UploadPostScreen: React.FC = () => {
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
   const [videoDuration, setVideoDuration] = useState<number | undefined>();
-  
-  // Video player for preview
-  const videoPlayer = fileUri && postType === 'video' 
-    ? useVideoPlayer(fileUri, (player) => {
-        player.loop = true;
-        player.muted = true;
-      })
-    : null;
+
+  // Video player for preview - always call hook with a valid source
+  // Use a placeholder URI when no video is selected to avoid hook order issues
+  const videoSource = fileUri && postType === 'video' ? fileUri : 'file://placeholder';
+  const videoPlayer = useVideoPlayer(videoSource, (player) => {
+    if (fileUri && postType === 'video') {
+      player.loop = true;
+      player.muted = true;
+    }
+  });
+
+  // Only use player when we have a valid video URI
+  const activeVideoPlayer = fileUri && postType === 'video' ? videoPlayer : null;
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -87,7 +92,7 @@ const UploadPostScreen: React.FC = () => {
     if (!result.canceled && result.assets[0]) {
       const durationMs = result.assets[0].duration || 0;
       const durationSeconds = durationMs / 1000;
-      
+
       // Validate minimum duration (10 seconds)
       if (durationSeconds < 10) {
         Toast.show({
@@ -97,7 +102,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       // Validate maximum duration (2 minutes = 120 seconds)
       // If video is longer, it should be trimmed by ImagePicker
       if (durationSeconds > 120) {
@@ -108,7 +113,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       setFileUri(result.assets[0].uri);
       setVideoDuration(durationSeconds);
       setPostType('video');
@@ -179,7 +184,7 @@ const UploadPostScreen: React.FC = () => {
     if (!result.canceled && result.assets[0]) {
       const durationMs = result.assets[0].duration || 0;
       const durationSeconds = durationMs / 1000;
-      
+
       // Validate minimum duration (10 seconds)
       if (durationSeconds < 10) {
         Toast.show({
@@ -189,7 +194,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       // Validate maximum duration (2 minutes = 120 seconds)
       if (durationSeconds > 120) {
         Toast.show({
@@ -199,7 +204,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       setFileUri(result.assets[0].uri);
       setVideoDuration(durationSeconds);
       setPostType('video');
@@ -226,7 +231,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       if (videoDuration < 10) {
         Toast.show({
           type: 'error',
@@ -235,7 +240,7 @@ const UploadPostScreen: React.FC = () => {
         });
         return;
       }
-      
+
       if (videoDuration > 120) {
         Toast.show({
           type: 'error',
@@ -362,10 +367,10 @@ const UploadPostScreen: React.FC = () => {
             <View style={styles.mediaContainer}>
               {postType === 'image' ? (
                 <Image source={{ uri: fileUri }} style={styles.media} />
-              ) : postType === 'video' && videoPlayer ? (
+              ) : postType === 'video' && activeVideoPlayer ? (
                 <View style={styles.videoContainer}>
                   <VideoView
-                    player={videoPlayer}
+                    player={activeVideoPlayer}
                     style={styles.media}
                     fullscreenOptions={{
                       enterFullscreen: true,
@@ -421,8 +426,8 @@ const UploadPostScreen: React.FC = () => {
                   postType === 'image'
                     ? 'image-outline'
                     : postType === 'video'
-                    ? 'videocam-outline'
-                    : 'document-text-outline'
+                      ? 'videocam-outline'
+                      : 'document-text-outline'
                 }
                 size={64}
                 color="#8E8E93"

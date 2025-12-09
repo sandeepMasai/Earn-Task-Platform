@@ -1,5 +1,6 @@
 const Story = require('../models/Story');
 const User = require('../models/User');
+const { getFileUrl } = require('../middleware/upload');
 
 // @desc    Get active stories
 // @route   GET /api/stories
@@ -78,7 +79,14 @@ exports.uploadStory = async (req, res) => {
       }
     }
 
-    const mediaUrl = `/uploads/${file.filename}`;
+    // Get file URL from Cloudinary or local storage
+    const mediaUrl = getFileUrl(file);
+    if (!mediaUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to process uploaded media',
+      });
+    }
 
     const story = await Story.create({
       user: req.user._id,

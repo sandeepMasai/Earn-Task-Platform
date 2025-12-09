@@ -71,8 +71,12 @@ const CreatorCoinRequestsScreen: React.FC = () => {
 
   const getProofImageUrl = (path: string) => {
     if (!path) return null;
-    if (path.startsWith('http')) return path;
-    return `${API_BASE_URL.replace('/api', '')}${path}`;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    // Handle relative paths
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return path.startsWith('/') ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
   };
 
   const renderRequest = ({ item }: { item: CreatorCoinRequest }) => {
@@ -96,7 +100,14 @@ const CreatorCoinRequestsScreen: React.FC = () => {
         </View>
 
         {proofUrl && (
-          <Image source={{ uri: proofUrl }} style={styles.proofImage} />
+          <Image
+            source={{ uri: proofUrl }}
+            style={styles.proofImage}
+            resizeMode="cover"
+            onError={(error) => {
+              console.log('Image load error:', error);
+            }}
+          />
         )}
 
         {item.status === 'rejected' && item.rejectionReason && (

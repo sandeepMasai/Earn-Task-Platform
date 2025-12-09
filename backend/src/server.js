@@ -7,6 +7,12 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
+// Log file size limits on startup
+console.log('\n📋 File Upload Configuration:');
+console.log(`   MAX_FILE_SIZE: ${process.env.MAX_FILE_SIZE || 'not set (default: 900MB)'}`);
+console.log(`   MAX_VIDEO_SIZE: ${process.env.MAX_VIDEO_SIZE || 'not set (default: 900MB)'}`);
+console.log('');
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
@@ -33,8 +39,8 @@ app.use(cors({
 // Handle preflight requests
 app.options('*', cors());
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1000mb' })); // Increased for large file uploads
+app.use(express.urlencoded({ extended: true, limit: '1000mb' })); // Increased for large file uploads
 
 // Log all requests
 app.use((req, res, next) => {
@@ -71,6 +77,55 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+
+  // Handle Multer errors specifically
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    // Check if it's a video upload (from field name or content type)
+    const isVideo = err.field === 'video' || err.field === 'media' ||
+      (req.file && req.file.mimetype && req.file.mimetype.startsWith('video/'));
+
+    const maxSizeMB = isVideo
+      ? (process.env.MAX_VIDEO_SIZE
+        ? Math.round(parseInt(process.env.MAX_VIDEO_SIZE) / (1024 * 1024))
+        : 900)
+      : (process.env.MAX_FILE_SIZE
+        ? Math.round(parseInt(process.env.MAX_FILE_SIZE) / (1024 * 1024))
+        : 900);
+
+    const fileType = isVideo ? 'video' : 'file';
+    return res.status(413).json({
+      success: false,
+      error: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} too large. Maximum ${fileType} size is ${maxSizeMB}MB`,
+    });
+  }
+
+  // Handle other Multer errors
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      // Check if it's a video upload
+      const isVideo = err.field === 'video' || err.field === 'media' ||
+        (req.file && req.file.mimetype && req.file.mimetype.startsWith('video/'));
+
+      const maxSizeMB = isVideo
+        ? (process.env.MAX_VIDEO_SIZE
+          ? Math.round(parseInt(process.env.MAX_VIDEO_SIZE) / (1024 * 1024))
+          : 900)
+        : (process.env.MAX_FILE_SIZE
+          ? Math.round(parseInt(process.env.MAX_FILE_SIZE) / (1024 * 1024))
+          : 900);
+
+      const fileType = isVideo ? 'video' : 'file';
+      return res.status(413).json({
+        success: false,
+        error: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} too large. Maximum ${fileType} size is ${maxSizeMB}MB`,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      error: `Upload error: ${err.message}`,
+    });
+  }
+
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal server error',

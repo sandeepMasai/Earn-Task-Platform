@@ -9,7 +9,7 @@ const {
   submitTaskProof,
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 
 router.get('/', protect, getTasks);
 router.get('/:id', protect, getTaskById);

@@ -124,6 +124,7 @@ export const ROUTES = {
   CREATOR_REQUEST_COINS: 'CreatorRequestCoins',
   CREATOR_COIN_REQUESTS: 'CreatorCoinRequests',
   CREATOR_CREATE_TASK: 'CreatorCreateTask',
+  CREATOR_EDIT_TASK: 'CreatorEditTask',
   CREATOR_REQUEST_HISTORY: 'CreatorRequestHistory',
   CREATOR_TASK_SUBMISSIONS: 'CreatorTaskSubmissions',
   CREATOR_TASK_SUBMISSION_DETAILS: 'CreatorTaskSubmissionDetails',

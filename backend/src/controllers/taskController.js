@@ -4,6 +4,7 @@ const Transaction = require('../models/Transaction');
 const TaskSubmission = require('../models/TaskSubmission');
 const { VIDEO_WATCH_PERCENTAGE } = require('../constants');
 const { getCoinValue } = require('../utils/coinHelper');
+const { getFileUrl } = require('../middleware/upload');
 
 // @desc    Get all tasks
 // @route   GET /api/tasks
@@ -15,7 +16,7 @@ exports.getTasks = async (req, res) => {
     const tasksWithCompletion = await Promise.all(
       tasks.map(async (task) => {
         const isCompleted = task.isCompletedByUser(req.user._id);
-        
+
         // For Instagram and YouTube tasks, check submission status
         let submissionStatus = null;
         if (task.type === 'instagram_follow' || task.type === 'instagram_like' || task.type === 'youtube_subscribe') {
@@ -44,7 +45,7 @@ exports.getTasks = async (req, res) => {
           isCompleted,
           completedAt: isCompleted
             ? task.completedBy.find((c) => c.user.toString() === req.user._id.toString())
-                ?.completedAt
+              ?.completedAt
             : null,
           submissionStatus, // For Instagram tasks: 'available', 'pending', 'approved', 'rejected'
           // Creator task fields
@@ -117,7 +118,7 @@ exports.getTaskById = async (req, res) => {
         isCompleted,
         completedAt: isCompleted
           ? task.completedBy.find((c) => c.user.toString() === req.user._id.toString())
-              ?.completedAt
+            ?.completedAt
           : null,
         submissionStatus,
         rejectionReason: submission?.rejectionReason || null,
@@ -340,9 +341,18 @@ exports.submitTaskProof = async (req, res) => {
       });
     }
 
+    // Get file URL from Cloudinary or local storage
+    const proofImageUrl = getFileUrl(req.file);
+    if (!proofImageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to process proof image',
+      });
+    }
+
     // If rejected, allow resubmission
     if (existingSubmission && existingSubmission.status === 'rejected') {
-      existingSubmission.proofImage = req.file.path;
+      existingSubmission.proofImage = proofImageUrl;
       existingSubmission.status = 'pending';
       existingSubmission.rejectionReason = null;
       existingSubmission.reviewedBy = null;
@@ -363,7 +373,7 @@ exports.submitTaskProof = async (req, res) => {
     const submission = await TaskSubmission.create({
       task: task._id,
       user: req.user._id,
-      proofImage: req.file.path,
+      proofImage: proofImageUrl,
       status: 'pending',
     });
 

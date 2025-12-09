@@ -74,19 +74,17 @@ const AppNavigator: React.FC = () => {
 
     return (
         <NavigationContainer>
-            <Stack.Navigator 
+            <Stack.Navigator
                 screenOptions={{ headerShown: false }}
                 initialRouteName={ROUTES.SPLASH}
             >
                 <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
-                {!isAuthenticated ? (
-                    <>
-                        <Stack.Screen name={ROUTES.ONBOARDING} component={OnboardingScreen} />
-                        <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
-                        <Stack.Screen name={ROUTES.SIGNUP} component={SignupScreen} />
-                        <Stack.Screen name={ROUTES.INSTAGRAM_ID} component={InstagramIdScreen} />
-                    </>
-                ) : (
+                {/* Always register auth screens to prevent navigation errors */}
+                <Stack.Screen name={ROUTES.ONBOARDING} component={OnboardingScreen} />
+                <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
+                <Stack.Screen name={ROUTES.SIGNUP} component={SignupScreen} />
+                <Stack.Screen name={ROUTES.INSTAGRAM_ID} component={InstagramIdScreen} />
+                {isAuthenticated && (
                     <>
                         <Stack.Screen name="MainTabs" component={MainTabsNavigator} />
                         <Stack.Screen
@@ -231,6 +229,11 @@ const AppNavigator: React.FC = () => {
                         />
                         <Stack.Screen
                             name={ROUTES.CREATOR_CREATE_TASK}
+                            component={CreatorCreateTaskScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.CREATOR_EDIT_TASK}
                             component={CreatorCreateTaskScreen}
                             options={{ headerShown: false }}
                         />

@@ -11,7 +11,7 @@ const {
   logout,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 const { body, validationResult } = require('express-validator');
 
 // Validation middleware

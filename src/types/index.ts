@@ -267,6 +267,7 @@ export type RootStackParamList = {
     CreatorRequestCoins: undefined;
     CreatorCoinRequests: undefined;
     CreatorCreateTask: undefined;
+    CreatorEditTask: { taskId: string; task?: any };
     CreatorRequestHistory: undefined;
     WithdrawalHistory: undefined;
     EarningHistory: undefined;

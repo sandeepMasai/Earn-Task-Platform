@@ -151,8 +151,13 @@ const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
   };
 
   const getProofImageUrl = (imagePath: string) => {
-    if (imagePath.startsWith('http')) return imagePath;
-    return `${API_BASE_URL.replace('/api', '')}${imagePath}`;
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    // Handle relative paths
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
   };
 
   const getStatusColor = (status: string) => {
@@ -193,8 +198,8 @@ const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
               submission.status === 'pending'
                 ? 'time-outline'
                 : submission.status === 'approved'
-                ? 'checkmark-circle'
-                : 'close-circle'
+                  ? 'checkmark-circle'
+                  : 'close-circle'
             }
             size={20}
             color={getStatusColor(submission.status)}
@@ -244,10 +249,10 @@ const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
                   {submission.task.type === 'instagram_follow'
                     ? 'Instagram Follow'
                     : submission.task.type === 'instagram_like'
-                    ? 'Instagram Like'
-                    : submission.task.type === 'youtube_subscribe'
-                    ? 'YouTube Subscribe'
-                    : submission.task.type}
+                      ? 'Instagram Like'
+                      : submission.task.type === 'youtube_subscribe'
+                        ? 'YouTube Subscribe'
+                        : submission.task.type}
                 </Text>
               </View>
             </View>
@@ -255,16 +260,21 @@ const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
         </View>
 
         {/* Proof Image */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Proof Screenshot</Text>
-          <View style={styles.proofContainer}>
-            <Image
-              source={{ uri: getProofImageUrl(submission.proofImage) }}
-              style={styles.proofImage}
-              resizeMode="contain"
-            />
+        {getProofImageUrl(submission.proofImage) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Proof Screenshot</Text>
+            <View style={styles.proofContainer}>
+              <Image
+                source={{ uri: getProofImageUrl(submission.proofImage)! }}
+                style={styles.proofImage}
+                resizeMode="contain"
+                onError={(error) => {
+                  console.log('Image load error:', error);
+                }}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Submission Info */}
         <View style={styles.section}>

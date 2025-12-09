@@ -12,7 +12,7 @@ const {
   deletePost,
 } = require('../controllers/postController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 
 router.get('/feed', protect, getFeed);
 router.post('/', protect, upload.single('image'), uploadPost);

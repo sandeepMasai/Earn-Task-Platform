@@ -6,6 +6,9 @@ const {
   requestCoins,
   getCoinRequests,
   createTask,
+  getCreatorTasks,
+  updateCreatorTask,
+  deleteCreatorTask,
   getCreatorRequestHistory,
   getTaskSubmissions,
   getTaskSubmissionById,
@@ -13,7 +16,7 @@ const {
   rejectTaskSubmission,
 } = require('../controllers/creatorController');
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 
 // Creator registration
 router.post('/register', protect, registerAsCreator);
@@ -25,8 +28,11 @@ router.get('/dashboard', protect, getCreatorDashboard);
 router.post('/request-coins', protect, upload.single('paymentProof'), requestCoins);
 router.get('/coin-requests', protect, getCoinRequests);
 
-// Creator task creation
+// Creator task management
 router.post('/tasks', protect, createTask);
+router.get('/tasks', protect, getCreatorTasks);
+router.put('/tasks/:id', protect, updateCreatorTask);
+router.delete('/tasks/:id', protect, deleteCreatorTask);
 
 // Creator request history
 router.get('/request-history', protect, getCreatorRequestHistory);

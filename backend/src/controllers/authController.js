@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const generateToken = require('../utils/generateToken');
 const { getCoinValue } = require('../utils/coinHelper');
+const { getFileUrl } = require('../middleware/upload');
 
 // @desc    Register user
 // @route   POST /api/auth/signup
@@ -50,7 +51,7 @@ exports.signup = async (req, res) => {
           // Get dynamic coin value for referral bonus
           const bonusAmount = await getCoinValue('REFERRAL_BONUS');
           const oldCoins = referrer.coins;
-          
+
           referrer.coins += bonusAmount;
           referrer.totalEarned += bonusAmount;
           await referrer.save();
@@ -64,7 +65,7 @@ exports.signup = async (req, res) => {
             amount: bonusAmount,
             description: `Referral bonus for referring ${user.username}`,
           });
-          
+
           console.log('✅ Transaction created for referral bonus');
         } else {
           console.log('❌ Referrer not found with ID:', referredBy);
@@ -325,7 +326,10 @@ exports.updateProfile = async (req, res) => {
 
     // Update avatar if provided (file upload will set req.file)
     if (req.file) {
-      user.avatar = `/uploads/${req.file.filename}`;
+      const avatarUrl = getFileUrl(req.file);
+      if (avatarUrl) {
+        user.avatar = avatarUrl;
+      }
     } else if (avatar !== undefined) {
       user.avatar = avatar;
     }

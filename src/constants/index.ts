@@ -109,6 +109,7 @@ export const ROUTES = {
   ADMIN_USERS: 'AdminUsers',
   ADMIN_USER_DETAILS: 'AdminUserDetails',
   ADMIN_COIN_MANAGEMENT: 'AdminCoinManagement',
+  ADMIN_WITHDRAWAL_MANAGEMENT: 'AdminWithdrawalManagement',
   ADMIN_TASKS: 'AdminTasks',
   ADMIN_CREATE_TASK: 'AdminCreateTask',
   ADMIN_EDIT_TASK: 'AdminEditTask',
@@ -134,7 +135,12 @@ export const ROUTES = {
   EARNING_HISTORY: 'EarningHistory',
   REFERRALS: 'Referrals',
   EDIT_PROFILE: 'EditProfile',
+  SETTINGS: 'Settings',
   PRIVACY_POLICY: 'PrivacyPolicy',
+  TERMS_AND_CONDITIONS: 'TermsAndConditions',
+  REFUND_POLICY: 'RefundPolicy',
+  COMMUNITY_GUIDELINES: 'CommunityGuidelines',
+  ABOUT_APP: 'AboutApp',
 
   // Feed
   COMMENTS: 'Comments',

@@ -59,7 +59,7 @@ export const adminService = {
   async getDashboardStats(): Promise<DashboardStats> {
     const response = await apiService.get<{ data: any }>('/admin/dashboard');
     const data = response.data;
-    
+
     // Transform _id to id for withdrawals and users
     const recentWithdrawals = (data.recentWithdrawals || []).map((w: any) => ({
       ...w,
@@ -69,12 +69,12 @@ export const adminService = {
         id: w.user?._id || w.user?.id,
       },
     }));
-    
+
     const recentUsers = (data.recentUsers || []).map((u: any) => ({
       ...u,
       id: u._id || u.id,
     }));
-    
+
     return {
       ...data,
       recentWithdrawals,
@@ -103,7 +103,7 @@ export const adminService = {
     const response = await apiService.get<{
       data: { withdrawals: any[]; pagination: any };
     }>(`/admin/payments?${queryParams.toString()}`);
-    
+
     // Transform _id to id
     const withdrawals = response.data.withdrawals.map((w: any) => ({
       ...w,
@@ -113,7 +113,7 @@ export const adminService = {
         id: w.user?._id || w.user?.id,
       },
     }));
-    
+
     return {
       withdrawals,
       pagination: response.data.pagination,
@@ -171,13 +171,13 @@ export const adminService = {
     const response = await apiService.get<{
       data: { users: any[]; pagination: any };
     }>(`/admin/users?${queryParams.toString()}`);
-    
+
     // Transform _id to id
     const users = response.data.users.map((u: any) => ({
       ...u,
       id: u._id || u.id,
     }));
-    
+
     return {
       users,
       pagination: response.data.pagination,
@@ -240,7 +240,7 @@ export const adminService = {
     const params: any = {};
     if (status) params.status = status;
     if (taskType) params.taskType = taskType;
-    
+
     const response = await apiService.get('/admin/task-submissions', { params });
     return response.data.map((sub: any) => ({
       ...sub,
@@ -315,9 +315,9 @@ export const adminService = {
       id: request._id || request.id,
       creator: request.creator
         ? {
-            ...request.creator,
-            id: request.creator._id || request.creator.id,
-          }
+          ...request.creator,
+          id: request.creator._id || request.creator.id,
+        }
         : null,
     }));
   },
@@ -331,6 +331,30 @@ export const adminService = {
     const response = await apiService.put(`/admin/creator-coin-requests/${requestId}/reject`, {
       rejectionReason,
     });
+    return response.data;
+  },
+
+  // Withdrawal Settings
+  async getWithdrawalSettings(): Promise<{
+    minimumWithdrawalAmount: number;
+    withdrawalAmounts: number[];
+    updatedAt?: string;
+    updatedBy?: string;
+  }> {
+    const response = await apiService.get('/admin/withdrawal-settings');
+    return response.data;
+  },
+
+  async updateWithdrawalSettings(data: {
+    minimumWithdrawalAmount?: number;
+    withdrawalAmounts?: number[];
+  }): Promise<{
+    minimumWithdrawalAmount: number;
+    withdrawalAmounts: number[];
+    updatedAt?: string;
+    updatedBy?: string;
+  }> {
+    const response = await apiService.put('/admin/withdrawal-settings', data);
     return response.data;
   },
 };

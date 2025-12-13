@@ -37,5 +37,13 @@ export const walletService = {
       id: w._id || w.id,
     })) as WithdrawalRequest[];
   },
+
+  async getWithdrawalSettings(): Promise<{
+    minimumWithdrawalAmount: number;
+    withdrawalAmounts: number[];
+  }> {
+    const response = await apiService.get<{ data: any }>('/wallet/withdrawal-settings');
+    return response.data;
+  },
 };
 

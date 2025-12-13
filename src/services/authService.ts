@@ -66,7 +66,7 @@ export const authService = {
     avatar?: string;
   }): Promise<User> {
     const formData = new FormData();
-    
+
     if (data.name) formData.append('name', data.name);
     if (data.email) formData.append('email', data.email);
     if (data.username) formData.append('username', data.username);

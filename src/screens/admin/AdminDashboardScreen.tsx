@@ -87,6 +87,12 @@ const AdminDashboardScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={() => navigation.navigate(ROUTES.ADMIN_WITHDRAWAL_MANAGEMENT)}
+          >
+            <Ionicons name="wallet-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => navigation.navigate(ROUTES.ADMIN_TASKS)}
           >
             <Ionicons name="list-outline" size={24} color="#007AFF" />
@@ -395,7 +401,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: 'red',
   },
   title: {
     fontSize: 24,
@@ -405,10 +411,11 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 15,
   },
   headerButton: {
     padding: 8,
+    marginTop: 20,
   },
   section: {
     marginTop: 20,

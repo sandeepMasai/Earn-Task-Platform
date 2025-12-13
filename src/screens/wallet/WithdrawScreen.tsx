@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { requestWithdrawal } from '@store/slices/walletSlice';
 import { formatCoins, formatCurrency, coinsToRupees } from '@utils/validation';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, MIN_WITHDRAWAL_AMOUNT } from '@constants';
+import { walletService } from '@services/walletService';
 import Button from '@components/common/Button';
 import Input from '@components/common/Input';
 import Toast from 'react-native-toast-message';
@@ -19,6 +20,22 @@ const WithdrawScreen: React.FC = () => {
   const [accountDetails, setAccountDetails] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [minWithdrawalAmount, setMinWithdrawalAmount] = useState(MIN_WITHDRAWAL_AMOUNT);
+  const [withdrawalAmounts, setWithdrawalAmounts] = useState<number[]>([]);
+
+  useEffect(() => {
+    const loadWithdrawalSettings = async () => {
+      try {
+        const settings = await walletService.getWithdrawalSettings();
+        setMinWithdrawalAmount(settings.minimumWithdrawalAmount);
+        setWithdrawalAmounts(settings.withdrawalAmounts);
+      } catch (error) {
+        console.error('Error loading withdrawal settings:', error);
+        // Use default if API fails
+      }
+    };
+    loadWithdrawalSettings();
+  }, []);
 
   const maxAmount = balance;
   const rupeesValue = amount ? coinsToRupees(parseFloat(amount) || 0) : 0;
@@ -29,8 +46,8 @@ const WithdrawScreen: React.FC = () => {
     const amountNum = parseFloat(amount);
     if (!amount || isNaN(amountNum) || amountNum <= 0) {
       newErrors.amount = 'Please enter a valid amount';
-    } else if (amountNum < MIN_WITHDRAWAL_AMOUNT) {
-      newErrors.amount = `Minimum withdrawal is ${formatCoins(MIN_WITHDRAWAL_AMOUNT)}`;
+    } else if (amountNum < minWithdrawalAmount) {
+      newErrors.amount = `Minimum withdrawal is ${formatCoins(minWithdrawalAmount)}`;
     } else if (amountNum > balance) {
       newErrors.amount = 'Insufficient balance';
     }
@@ -87,13 +104,42 @@ const WithdrawScreen: React.FC = () => {
         <View style={styles.form}>
           <Input
             label="Withdrawal Amount (Coins)"
-            placeholder={`Min: ${formatCoins(MIN_WITHDRAWAL_AMOUNT)}`}
+            placeholder={`Min: ${formatCoins(minWithdrawalAmount)}`}
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
             error={errors.amount}
             containerStyle={styles.inputContainer}
           />
+
+          {withdrawalAmounts.length > 0 && (
+            <View style={styles.quickAmountsContainer}>
+              <Text style={styles.quickAmountsLabel}>Quick Select:</Text>
+              <View style={styles.quickAmountsRow}>
+                {withdrawalAmounts
+                  .filter((a) => a <= balance && a >= minWithdrawalAmount)
+                  .map((quickAmount) => (
+                    <TouchableOpacity
+                      key={quickAmount}
+                      style={[
+                        styles.quickAmountButton,
+                        amount === quickAmount.toString() && styles.quickAmountButtonActive,
+                      ]}
+                      onPress={() => setAmount(quickAmount.toString())}
+                    >
+                      <Text
+                        style={[
+                          styles.quickAmountText,
+                          amount === quickAmount.toString() && styles.quickAmountTextActive,
+                        ]}
+                      >
+                        {formatCoins(quickAmount)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            </View>
+          )}
 
           {amount && !errors.amount && (
             <View style={styles.amountInfo}>
@@ -133,15 +179,15 @@ const WithdrawScreen: React.FC = () => {
               paymentMethod === 'UPI'
                 ? 'UPI ID'
                 : paymentMethod === 'Bank Transfer'
-                ? 'Account Number & IFSC'
-                : 'Account Details'
+                  ? 'Account Number & IFSC'
+                  : 'Account Details'
             }
             placeholder={
               paymentMethod === 'UPI'
                 ? 'yourname@upi'
                 : paymentMethod === 'Bank Transfer'
-                ? 'Account Number, IFSC Code'
-                : 'Enter account details'
+                  ? 'Account Number, IFSC Code'
+                  : 'Enter account details'
             }
             value={accountDetails}
             onChangeText={setAccountDetails}
@@ -151,7 +197,7 @@ const WithdrawScreen: React.FC = () => {
 
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              • Minimum withdrawal: {formatCoins(MIN_WITHDRAWAL_AMOUNT)}
+              • Minimum withdrawal: {formatCoins(minWithdrawalAmount)}
             </Text>
             <Text style={styles.infoText}>
               • Withdrawal requests are processed within 24-48 hours
@@ -270,6 +316,40 @@ const styles = StyleSheet.create({
   },
   withdrawButton: {
     marginTop: 8,
+  },
+  quickAmountsContainer: {
+    marginBottom: 16,
+  },
+  quickAmountsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  quickAmountsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickAmountButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    backgroundColor: '#FFFFFF',
+  },
+  quickAmountButtonActive: {
+    borderColor: '#007AFF',
+    backgroundColor: '#007AFF20',
+  },
+  quickAmountText: {
+    fontSize: 14,
+    color: '#000000',
+  },
+  quickAmountTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });
 

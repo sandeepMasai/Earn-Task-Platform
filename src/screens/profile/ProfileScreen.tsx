@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl, Image, Linking, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
-import { logoutUser, refreshUser } from '@store/slices/authSlice';
+import { refreshUser } from '@store/slices/authSlice';
 import { formatCoins } from '@utils/validation';
 import { ROUTES, API_BASE_URL, SUPPORT_CHANNELS } from '@constants';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,26 +26,6 @@ const ProfileScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await dispatch(logoutUser());
-            navigation.reset({
-              index: 0,
-              routes: [{ name: ROUTES.LOGIN }],
-            });
-          },
-        },
-      ]
-    );
-  };
 
   const handleHelpSupport = () => {
     Alert.alert(
@@ -125,11 +105,6 @@ const ProfileScreen: React.FC = () => {
 
   const menuItems = [
     {
-      icon: 'person-outline',
-      title: 'Edit Profile',
-      onPress: () => navigation.navigate(ROUTES.EDIT_PROFILE),
-    },
-    {
       icon: 'cash-outline',
       title: 'Earning History',
       onPress: () => navigation.navigate(ROUTES.EARNING_HISTORY),
@@ -157,45 +132,17 @@ const ProfileScreen: React.FC = () => {
     {
       icon: 'settings-outline',
       title: 'Settings',
-      onPress: () => console.log('Settings'),
+      onPress: () => navigation.navigate(ROUTES.SETTINGS),
     },
     {
       icon: 'help-circle-outline',
       title: 'Help & Support',
       onPress: handleHelpSupport,
     },
-    {
-      icon: 'shield-checkmark-outline',
-      title: 'Privacy Policy',
-      onPress: () => navigation.navigate(ROUTES.PRIVACY_POLICY),
-    },
-    {
-      icon: 'log-out-outline',
-      title: 'Logout',
-      onPress: handleLogout,
-      color: '#FF3B30',
-    },
   ];
 
-  // Creator menu items - show to all users
+  // Show additional creator options if user is an approved creator
   const creatorMenuItems = [];
-
-  // Always show "Become a Creator" option to all users
-  creatorMenuItems.push({
-    icon: 'star-outline',
-    title: 'Become a Creator',
-    onPress: () => navigation.navigate(ROUTES.CREATOR_REGISTER),
-    color: '#FF9500',
-  });
-
-  // Show request history for all users (to see their registration status)
-  creatorMenuItems.push({
-    icon: 'time-outline',
-    title: 'My Creator Request',
-    onPress: () => navigation.navigate(ROUTES.CREATOR_REQUEST_HISTORY),
-  });
-
-  // Show additional options if user is an approved creator
   if (user?.isCreator && user?.creatorStatus === 'approved') {
     creatorMenuItems.push(
       {

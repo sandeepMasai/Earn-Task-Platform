@@ -28,6 +28,7 @@ import AdminPaymentsScreen from '@screens/admin/AdminPaymentsScreen';
 import AdminUsersScreen from '@screens/admin/AdminUsersScreen';
 import AdminUserDetailsScreen from '@screens/admin/AdminUserDetailsScreen';
 import AdminCoinManagementScreen from '@screens/admin/AdminCoinManagementScreen';
+import AdminWithdrawalManagementScreen from '@screens/admin/AdminWithdrawalManagementScreen';
 import AdminTasksScreen from '@screens/admin/AdminTasksScreen';
 import AdminCreateTaskScreen from '@screens/admin/AdminCreateTaskScreen';
 import AdminEditTaskScreen from '@screens/admin/AdminEditTaskScreen';
@@ -40,7 +41,12 @@ import WithdrawalHistoryScreen from '@screens/profile/WithdrawalHistoryScreen';
 import EarningHistoryScreen from '@screens/profile/EarningHistoryScreen';
 import ReferralsScreen from '@screens/profile/ReferralsScreen';
 import EditProfileScreen from '@screens/profile/EditProfileScreen';
+import SettingsScreen from '@screens/profile/SettingsScreen';
 import PrivacyPolicyScreen from '@screens/profile/PrivacyPolicyScreen';
+import TermsAndConditionsScreen from '@screens/profile/TermsAndConditionsScreen';
+import RefundPolicyScreen from '@screens/profile/RefundPolicyScreen';
+import CommunityGuidelinesScreen from '@screens/profile/CommunityGuidelinesScreen';
+import AboutAppScreen from '@screens/profile/AboutAppScreen';
 
 // Feed Screens
 import CommentsScreen from '@screens/feed/CommentsScreen';
@@ -134,6 +140,11 @@ const AppNavigator: React.FC = () => {
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
+                            name={ROUTES.ADMIN_WITHDRAWAL_MANAGEMENT}
+                            component={AdminWithdrawalManagementScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
                             name={ROUTES.ADMIN_TASKS}
                             component={AdminTasksScreen}
                             options={{ headerShown: false }}
@@ -194,8 +205,33 @@ const AppNavigator: React.FC = () => {
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
+                            name={ROUTES.SETTINGS}
+                            component={SettingsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
                             name={ROUTES.PRIVACY_POLICY}
                             component={PrivacyPolicyScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.TERMS_AND_CONDITIONS}
+                            component={TermsAndConditionsScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.REFUND_POLICY}
+                            component={RefundPolicyScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.COMMUNITY_GUIDELINES}
+                            component={CommunityGuidelinesScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.ABOUT_APP}
+                            component={AboutAppScreen}
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen

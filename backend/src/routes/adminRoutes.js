@@ -22,6 +22,8 @@ const {
   getCreatorCoinRequests,
   approveCreatorCoinRequest,
   rejectCreatorCoinRequest,
+  getWithdrawalSettings,
+  updateWithdrawalSettings,
 } = require('../controllers/adminController');
 const { admin } = require('../middleware/admin');
 
@@ -59,6 +61,10 @@ router.put('/creator-requests/:id/reject', admin, rejectCreator);
 router.get('/creator-coin-requests', admin, getCreatorCoinRequests);
 router.put('/creator-coin-requests/:id/approve', admin, approveCreatorCoinRequest);
 router.put('/creator-coin-requests/:id/reject', admin, rejectCreatorCoinRequest);
+
+// Withdrawal Settings
+router.get('/withdrawal-settings', admin, getWithdrawalSettings);
+router.put('/withdrawal-settings', admin, updateWithdrawalSettings);
 
 module.exports = router;
 

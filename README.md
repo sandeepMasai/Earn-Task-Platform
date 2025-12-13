@@ -2,6 +2,37 @@
 
 A complete React Native application for earning rewards by completing tasks like watching videos, following Instagram accounts, subscribing to YouTube channels, and uploading posts.
 
+## Quick Start
+
+### Development
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+
+# Run on specific platform
+npm run ios      # iOS Simulator
+npm run android  # Android Emulator
+npm run web      # Web Browser
+```
+
+### Building for Production
+See [BUILD_GUIDE.md](./BUILD_GUIDE.md) for detailed build instructions.
+
+**Quick Build Commands:**
+```bash
+# Install EAS CLI (if not installed)
+npm install -g eas-cli
+
+# Login to Expo
+eas login
+
+# Build for production
+eas build --platform all --profile production
+```
+
 ## Features
 
 - **Authentication Flow**: Splash screen, onboarding, login, signup, and Instagram ID setup

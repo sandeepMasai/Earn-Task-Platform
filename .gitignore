@@ -14,4 +14,11 @@ web-build/
 .DS_Store
 .env
 .env.local
+google-service-account.json
+*.keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 

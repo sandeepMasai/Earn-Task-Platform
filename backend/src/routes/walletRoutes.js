@@ -5,6 +5,7 @@ const {
   getTransactions,
   requestWithdrawal,
   getWithdrawals,
+  getWithdrawalSettings,
 } = require('../controllers/walletController');
 const { protect } = require('../middleware/auth');
 const { body } = require('express-validator');
@@ -19,6 +20,7 @@ router.get('/balance', protect, getBalance);
 router.get('/transactions', protect, getTransactions);
 router.post('/withdraw', protect, withdrawalValidation, requestWithdrawal);
 router.get('/withdrawals', protect, getWithdrawals);
+router.get('/withdrawal-settings', getWithdrawalSettings);
 
 module.exports = router;
 

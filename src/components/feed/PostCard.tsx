@@ -22,13 +22,13 @@ interface PostCardProps {
   shouldPlay?: boolean; // Whether video should be playing
 }
 
-const PostCard: React.FC<PostCardProps> = ({ 
-  post, 
-  onLike, 
-  onComment, 
-  onFollow, 
-  onEdit, 
-  onDelete, 
+const PostCard: React.FC<PostCardProps> = ({
+  post,
+  onLike,
+  onComment,
+  onFollow,
+  onEdit,
+  onDelete,
   showMenu = false,
   isVisible = true,
   shouldPlay = true,
@@ -44,44 +44,73 @@ const PostCard: React.FC<PostCardProps> = ({
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showPlayIcon, setShowPlayIcon] = useState(false); // Hide play icon initially
-  
+
   const player = post.videoUrl
     ? useVideoPlayer(post.videoUrl, (player) => {
-        player.loop = true;
-        player.muted = true; // Start muted
-        player.play();
-        setIsPlaying(true);
-      })
+      player.loop = true;
+      player.muted = true; // Start muted
+      // Don't play immediately - let the visibility effect handle it
+    })
     : null;
 
   // Control video play/pause based on visibility
   React.useEffect(() => {
     if (!player || !post.videoUrl) return;
 
-    if (isVisible && shouldPlay) {
-      // Video is visible and should play
-      try {
-        player.play();
-        setIsPlaying(true);
-        setShowPlayIcon(true);
-        // Auto-hide play icon after 3 seconds
-        const timeout = setTimeout(() => {
+    let playIconTimeout: NodeJS.Timeout | null = null;
+    let retryTimeout: NodeJS.Timeout | null = null;
+
+    // Small delay to ensure player is ready
+    const playTimeout = setTimeout(() => {
+      if (isVisible && shouldPlay) {
+        // Video is visible and should play
+        const attemptPlay = () => {
+          try {
+            player.play();
+            setIsPlaying(true);
+            setShowPlayIcon(true);
+            // Auto-hide play icon after 3 seconds
+            playIconTimeout = setTimeout(() => {
+              setShowPlayIcon(false);
+            }, 3000);
+          } catch (error) {
+            console.log('Video play error:', error);
+            // Retry after a short delay if player wasn't ready
+            retryTimeout = setTimeout(() => {
+              try {
+                if (isVisible && shouldPlay && player) {
+                  player.play();
+                  setIsPlaying(true);
+                  setShowPlayIcon(true);
+                  playIconTimeout = setTimeout(() => {
+                    setShowPlayIcon(false);
+                  }, 3000);
+                }
+              } catch (retryError) {
+                console.log('Video play retry error:', retryError);
+              }
+            }, 500);
+          }
+        };
+
+        attemptPlay();
+      } else {
+        // Video is not visible or shouldn't play - pause it
+        try {
+          player.pause();
+          setIsPlaying(false);
           setShowPlayIcon(false);
-        }, 3000);
-        return () => clearTimeout(timeout);
-      } catch (error) {
-        console.log('Video play error:', error);
+        } catch (error) {
+          console.log('Video pause error:', error);
+        }
       }
-    } else {
-      // Video is not visible or shouldn't play - pause it
-      try {
-        player.pause();
-        setIsPlaying(false);
-        setShowPlayIcon(false);
-      } catch (error) {
-        console.log('Video pause error:', error);
-      }
-    }
+    }, 200);
+
+    return () => {
+      clearTimeout(playTimeout);
+      if (playIconTimeout) clearTimeout(playIconTimeout);
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
   }, [player, post.videoUrl, isVisible, shouldPlay]);
 
   // Update mute state when isMuted changes
@@ -98,7 +127,7 @@ const PostCard: React.FC<PostCardProps> = ({
   const handleVideoPress = (e?: any) => {
     e?.stopPropagation?.();
     if (!player) return;
-    
+
     // Clear any existing timeout
     if (controlsTimeout) {
       clearTimeout(controlsTimeout);
@@ -108,14 +137,14 @@ const PostCard: React.FC<PostCardProps> = ({
     try {
       // Get current playing state directly from player
       const currentlyPlaying = player.playing ?? isPlaying;
-      
+
       if (currentlyPlaying) {
         // Pause the video
         player.pause();
         setIsPlaying(false);
         setShowControls(true);
         setShowPlayIcon(true);
-        
+
         // Auto-hide play icon after 3 seconds
         const timeout = setTimeout(() => {
           setShowPlayIcon(false);
@@ -127,7 +156,7 @@ const PostCard: React.FC<PostCardProps> = ({
         setIsPlaying(true);
         setShowControls(true);
         setShowPlayIcon(true);
-        
+
         // Hide controls and icon after 3 seconds if playing
         const timeout = setTimeout(() => {
           setShowControls(false);
@@ -182,7 +211,7 @@ const PostCard: React.FC<PostCardProps> = ({
 
     const updateStatus = () => {
       if (!isMounted || !player) return;
-      
+
       try {
         // Check if player is playing - use the playing property directly
         const playing = player.playing;
@@ -214,7 +243,7 @@ const PostCard: React.FC<PostCardProps> = ({
 
     // Update status more frequently for better responsiveness
     const interval = setInterval(updateStatus, 150);
-    
+
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -225,7 +254,7 @@ const PostCard: React.FC<PostCardProps> = ({
     try {
       const shareUrl = post.videoUrl || post.imageUrl || post.documentUrl || '';
       const message = `${post.userName}: ${post.caption || 'Check out this post!'}`;
-      
+
       // If no URL available, just share the message
       if (!shareUrl) {
         await Share.share({
@@ -237,18 +266,18 @@ const PostCard: React.FC<PostCardProps> = ({
 
       // Check if URL is a local file (file://) or remote (http://)
       const isLocalFile = shareUrl.startsWith('file://') || shareUrl.startsWith('/');
-      
+
       if (isLocalFile) {
         // For local files, use expo-sharing if available
         if (await Sharing.isAvailableAsync()) {
           try {
             await Sharing.shareAsync(shareUrl, {
-              mimeType: 
-                post.type === 'video' 
-                  ? 'video/mp4' 
-                  : post.type === 'image' 
-                  ? 'image/jpeg' 
-                  : 'application/pdf',
+              mimeType:
+                post.type === 'video'
+                  ? 'video/mp4'
+                  : post.type === 'image'
+                    ? 'image/jpeg'
+                    : 'application/pdf',
               dialogTitle: 'Share Post',
             });
           } catch (shareError) {
@@ -271,12 +300,12 @@ const PostCard: React.FC<PostCardProps> = ({
           message: `${message}\n\n${shareUrl}`,
           title: 'Share Post',
         };
-        
+
         // iOS supports url parameter for better sharing
         if (Platform.OS === 'ios') {
           shareOptions.url = shareUrl;
         }
-        
+
         await Share.share(shareOptions);
       }
     } catch (error: any) {
@@ -413,75 +442,75 @@ const PostCard: React.FC<PostCardProps> = ({
             activeOpacity={1}
             delayLongPress={500}
           >
-          <VideoView
-            player={player!}
-            style={styles.media}
-            fullscreenOptions={{
-              enterFullscreen: true,
-              exitFullscreen: true,
-            }}
-            allowsPictureInPicture
-            nativeControls={false}
-            contentFit="cover"
-          />
-          {/* Mute/Unmute Button */}
-          <TouchableOpacity
-            style={styles.muteButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              toggleMute();
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isMuted ? 'volume-mute' : 'volume-high'}
-              size={24}
-              color="#FFFFFF"
+            <VideoView
+              player={player!}
+              style={styles.media}
+              fullscreenOptions={{
+                enterFullscreen: true,
+                exitFullscreen: true,
+              }}
+              allowsPictureInPicture
+              nativeControls={false}
+              contentFit="cover"
             />
-          </TouchableOpacity>
-          
-          {/* Play/Pause Overlay - Auto-hides after 3 seconds */}
-          {showPlayIcon && (
-            <TouchableOpacity 
-              style={styles.playOverlay}
-              onPress={handleVideoPress}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name={isPlaying ? "pause-circle" : "play-circle"} 
-                size={64} 
-                color="#FFFFFF" 
-              />
-            </TouchableOpacity>
-          )}
-          
-          {/* Play/Pause Indicator (small icon) */}
-          {showControls && (
-            <TouchableOpacity 
-              style={styles.controlsIndicator}
-              onPress={handleVideoPress}
+            {/* Mute/Unmute Button */}
+            <TouchableOpacity
+              style={styles.muteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleMute();
+              }}
               activeOpacity={0.7}
             >
               <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={16}
+                name={isMuted ? 'volume-mute' : 'volume-high'}
+                size={24}
                 color="#FFFFFF"
               />
             </TouchableOpacity>
-          )}
-          
-          {/* Duration Badge */}
-          {post.videoDuration && (
-            <View style={styles.durationBadge}>
-              <Ionicons name="time-outline" size={14} color="#FFFFFF" />
-              <Text style={styles.durationText}>
-                {Math.floor(post.videoDuration / 60)}:
-                {Math.floor(post.videoDuration % 60)
-                  .toString()
-                  .padStart(2, '0')}
-              </Text>
-            </View>
-          )}
+
+            {/* Play/Pause Overlay - Auto-hides after 3 seconds */}
+            {showPlayIcon && (
+              <TouchableOpacity
+                style={styles.playOverlay}
+                onPress={handleVideoPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={isPlaying ? "pause-circle" : "play-circle"}
+                  size={64}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Play/Pause Indicator (small icon) */}
+            {showControls && (
+              <TouchableOpacity
+                style={styles.controlsIndicator}
+                onPress={handleVideoPress}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isPlaying ? 'pause' : 'play'}
+                  size={16}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Duration Badge */}
+            {post.videoDuration && (
+              <View style={styles.durationBadge}>
+                <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.durationText}>
+                  {Math.floor(post.videoDuration / 60)}:
+                  {Math.floor(post.videoDuration % 60)
+                    .toString()
+                    .padStart(2, '0')}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       ) : post.type === 'document' && post.documentUrl ? (
@@ -494,8 +523,8 @@ const PostCard: React.FC<PostCardProps> = ({
               post.documentType === 'pdf'
                 ? 'document-text'
                 : post.documentType === 'text'
-                ? 'document'
-                : 'document-attach'
+                  ? 'document'
+                  : 'document-attach'
             }
             size={64}
             color="#007AFF"
@@ -548,7 +577,7 @@ const PostCard: React.FC<PostCardProps> = ({
           <Ionicons name="bookmark-outline" size={28} color="#000000" />
         </TouchableOpacity>
       </View>
-      
+
       {/* Likes Count */}
       {post.likes > 0 && (
         <View style={styles.likesContainer}>

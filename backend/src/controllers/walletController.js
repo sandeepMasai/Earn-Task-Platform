@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const Withdrawal = require('../models/Withdrawal');
+const WithdrawalSettings = require('../models/WithdrawalSettings');
 const { MIN_WITHDRAWAL_AMOUNT } = require('../constants');
 
 // @desc    Get wallet balance
@@ -67,10 +68,14 @@ exports.requestWithdrawal = async (req, res) => {
       });
     }
 
-    if (amount < MIN_WITHDRAWAL_AMOUNT) {
+    // Get dynamic minimum withdrawal amount
+    const settings = await WithdrawalSettings.getSettings();
+    const minWithdrawalAmount = settings.minimumWithdrawalAmount || MIN_WITHDRAWAL_AMOUNT;
+
+    if (amount < minWithdrawalAmount) {
       return res.status(400).json({
         success: false,
-        error: `Minimum withdrawal amount is ${MIN_WITHDRAWAL_AMOUNT} coins`,
+        error: `Minimum withdrawal amount is ${minWithdrawalAmount} coins`,
       });
     }
 
@@ -145,6 +150,27 @@ exports.getWithdrawals = async (req, res) => {
         processedAt: w.processedAt,
         rejectionReason: w.rejectionReason,
       })),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get withdrawal settings (public)
+// @route   GET /api/wallet/withdrawal-settings
+// @access  Public
+exports.getWithdrawalSettings = async (req, res) => {
+  try {
+    const settings = await WithdrawalSettings.getSettings();
+    res.json({
+      success: true,
+      data: {
+        minimumWithdrawalAmount: settings.minimumWithdrawalAmount,
+        withdrawalAmounts: settings.withdrawalAmounts,
+      },
     });
   } catch (error) {
     res.status(500).json({

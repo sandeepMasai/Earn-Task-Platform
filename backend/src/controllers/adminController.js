@@ -6,6 +6,7 @@ const TaskSubmission = require('../models/TaskSubmission');
 const CreatorCoinRequest = require('../models/CreatorCoinRequest');
 const Post = require('../models/Post');
 const CoinConfig = require('../models/CoinConfig');
+const WithdrawalSettings = require('../models/WithdrawalSettings');
 const { COIN_VALUES } = require('../constants');
 const { clearCoinCache } = require('../utils/coinHelper');
 
@@ -554,7 +555,7 @@ exports.updateCoinConfigs = async (req, res) => {
 exports.getTaskSubmissions = async (req, res) => {
   try {
     const { status, taskType } = req.query;
-    
+
     const query = {};
     if (status) {
       query.status = status;
@@ -659,10 +660,10 @@ exports.getTaskSubmissionById = async (req, res) => {
         rejectionReason: submission.rejectionReason,
         reviewedBy: submission.reviewedBy
           ? {
-              id: submission.reviewedBy._id,
-              name: submission.reviewedBy.name,
-              username: submission.reviewedBy.username,
-            }
+            id: submission.reviewedBy._id,
+            name: submission.reviewedBy.name,
+            username: submission.reviewedBy.username,
+          }
           : null,
         reviewedAt: submission.reviewedAt,
         submittedAt: submission.createdAt,
@@ -840,10 +841,10 @@ exports.getCreatorRequests = async (req, res) => {
       instagramUrl: creator.creatorInstagramUrl,
       approvedBy: creator.creatorApprovedBy
         ? {
-            id: creator.creatorApprovedBy._id,
-            name: creator.creatorApprovedBy.name,
-            username: creator.creatorApprovedBy.username,
-          }
+          id: creator.creatorApprovedBy._id,
+          name: creator.creatorApprovedBy.name,
+          username: creator.creatorApprovedBy.username,
+        }
         : null,
       approvedAt: creator.creatorApprovedAt,
       requestedAt: creator.createdAt,
@@ -981,10 +982,10 @@ exports.getCreatorCoinRequests = async (req, res) => {
       rejectionReason: req.rejectionReason,
       reviewedBy: req.reviewedBy
         ? {
-            id: req.reviewedBy._id,
-            name: req.reviewedBy.name,
-            username: req.reviewedBy.username,
-          }
+          id: req.reviewedBy._id,
+          name: req.reviewedBy.name,
+          username: req.reviewedBy.username,
+        }
         : null,
       reviewedAt: req.reviewedAt,
       requestedAt: req.createdAt,
@@ -1124,6 +1125,95 @@ exports.rejectCreatorCoinRequest = async (req, res) => {
         reviewedAt: request.reviewedAt,
         rejectionReason: request.rejectionReason,
       },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get withdrawal settings
+// @route   GET /api/admin/withdrawal-settings
+// @access  Private/Admin
+exports.getWithdrawalSettings = async (req, res) => {
+  try {
+    const settings = await WithdrawalSettings.getSettings();
+    res.json({
+      success: true,
+      data: {
+        minimumWithdrawalAmount: settings.minimumWithdrawalAmount,
+        withdrawalAmounts: settings.withdrawalAmounts,
+        updatedAt: settings.updatedAt,
+        updatedBy: settings.updatedBy,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update withdrawal settings
+// @route   PUT /api/admin/withdrawal-settings
+// @access  Private/Admin
+exports.updateWithdrawalSettings = async (req, res) => {
+  try {
+    const { minimumWithdrawalAmount, withdrawalAmounts } = req.body;
+
+    if (minimumWithdrawalAmount !== undefined && minimumWithdrawalAmount < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minimum withdrawal amount must be a positive number',
+      });
+    }
+
+    if (withdrawalAmounts !== undefined) {
+      if (!Array.isArray(withdrawalAmounts) || withdrawalAmounts.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Withdrawal amounts must be a non-empty array',
+        });
+      }
+      if (!withdrawalAmounts.every((amount) => amount > 0)) {
+        return res.status(400).json({
+          success: false,
+          error: 'All withdrawal amounts must be positive numbers',
+        });
+      }
+    }
+
+    let settings = await WithdrawalSettings.findOne();
+    if (!settings) {
+      settings = new WithdrawalSettings({
+        minimumWithdrawalAmount: minimumWithdrawalAmount || 1000,
+        withdrawalAmounts: withdrawalAmounts || [100, 500, 1000, 2000, 5000, 10000],
+        updatedBy: req.user._id,
+      });
+    } else {
+      if (minimumWithdrawalAmount !== undefined) {
+        settings.minimumWithdrawalAmount = minimumWithdrawalAmount;
+      }
+      if (withdrawalAmounts !== undefined) {
+        settings.withdrawalAmounts = withdrawalAmounts;
+      }
+      settings.updatedBy = req.user._id;
+    }
+
+    await settings.save();
+
+    res.json({
+      success: true,
+      data: {
+        minimumWithdrawalAmount: settings.minimumWithdrawalAmount,
+        withdrawalAmounts: settings.withdrawalAmounts,
+        updatedAt: settings.updatedAt,
+        updatedBy: settings.updatedBy,
+      },
+      message: 'Withdrawal settings updated successfully',
     });
   } catch (error) {
     res.status(500).json({

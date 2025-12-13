@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
@@ -7,6 +7,7 @@ import { refreshUser } from '@store/slices/authSlice';
 import { formatCoins, formatCurrency, formatDate } from '@utils/validation';
 import { coinsToRupees } from '@utils/validation';
 import { ROUTES, MIN_WITHDRAWAL_AMOUNT } from '@constants';
+import { walletService } from '@services/walletService';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ const WalletScreen: React.FC = () => {
     (state) => state.wallet
   );
   const [refreshing, setRefreshing] = React.useState(false);
+  const [minWithdrawalAmount, setMinWithdrawalAmount] = useState(MIN_WITHDRAWAL_AMOUNT);
 
   const loadData = () => {
     dispatch(fetchBalance());
@@ -27,6 +29,16 @@ const WalletScreen: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const loadWithdrawalSettings = async () => {
+      try {
+        const settings = await walletService.getWithdrawalSettings();
+        setMinWithdrawalAmount(settings.minimumWithdrawalAmount);
+      } catch (error) {
+        console.error('Error loading withdrawal settings:', error);
+        // Use default if API fails
+      }
+    };
+    loadWithdrawalSettings();
   }, [dispatch]);
 
   // Refresh when screen comes into focus
@@ -46,7 +58,7 @@ const WalletScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const canWithdraw = balance >= MIN_WITHDRAWAL_AMOUNT;
+  const canWithdraw = balance >= minWithdrawalAmount;
   const rupeesValue = coinsToRupees(balance);
 
   const renderTransaction = ({ item }: { item: any }) => {
@@ -116,8 +128,8 @@ const WalletScreen: React.FC = () => {
       <Button
         title={
           canWithdraw
-            ? `Withdraw (Min: ${formatCoins(MIN_WITHDRAWAL_AMOUNT)})`
-            : `Need ${formatCoins(MIN_WITHDRAWAL_AMOUNT - balance)} more to withdraw`
+            ? `Withdraw (Min: ${formatCoins(minWithdrawalAmount)})`
+            : `Need ${formatCoins(minWithdrawalAmount - balance)} more to withdraw`
         }
         onPress={() => navigation.navigate(ROUTES.WITHDRAW)}
         disabled={!canWithdraw}

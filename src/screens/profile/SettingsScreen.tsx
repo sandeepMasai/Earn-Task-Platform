@@ -41,7 +41,7 @@ const SettingsScreen: React.FC = () => {
     );
   };
 
-  const appVersion = Constants.expoConfig?.version || Constants.manifest?.version || '1.0.0';
+  const appVersion = Constants.expoConfig?.version || (Constants.manifest as any)?.version || '1.0.0';
 
   const accountSection = [
     {

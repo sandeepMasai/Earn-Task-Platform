@@ -164,7 +164,7 @@ const VideoPlayerScreen: React.FC = () => {
 
     try {
       const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
-      const coinsEarned = result.result?.coins || result.coins || task.coins || COIN_VALUES.WATCH_VIDEO;
+      const coinsEarned = (result.result as any)?.coins || (result as any).coins || task.coins || COIN_VALUES.WATCH_VIDEO;
       dispatch(addCoins(coinsEarned));
       dispatch(updateUserCoins(coinsEarned));
       setHasCompleted(true);
@@ -210,7 +210,7 @@ const VideoPlayerScreen: React.FC = () => {
     try {
       const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
       // completeTask returns { taskId, result: { coins, message } }
-      const coinsEarned = result.result?.coins || result.coins || task.coins || COIN_VALUES.WATCH_VIDEO;
+      const coinsEarned = (result.result as any)?.coins || (result as any).coins || task.coins || COIN_VALUES.WATCH_VIDEO;
       dispatch(addCoins(coinsEarned));
       dispatch(updateUserCoins(coinsEarned));
       setHasCompleted(true);

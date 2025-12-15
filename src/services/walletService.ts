@@ -42,8 +42,11 @@ export const walletService = {
     minimumWithdrawalAmount: number;
     withdrawalAmounts: number[];
   }> {
-    const response = await apiService.get<{ data: any }>('/wallet/withdrawal-settings');
-    return response.data;
+    const response = await apiService.get<{
+      minimumWithdrawalAmount: number;
+      withdrawalAmounts: number[];
+    }>('/wallet/withdrawal-settings');
+    return response.data as any;
   },
 };
 

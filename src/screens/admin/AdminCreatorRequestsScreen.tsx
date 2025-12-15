@@ -104,7 +104,7 @@ const AdminCreatorRequestsScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
-          onPress: async (reason) => {
+          onPress: async (reason?: string) => {
             try {
               await adminService.rejectCreator(requestId, reason || 'Request rejected');
               Toast.show({

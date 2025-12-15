@@ -8,18 +8,18 @@ export interface FollowStats {
 
 export const followService = {
   async followUser(userId: string): Promise<FollowStats> {
-    const response = await apiService.post<{ data: FollowStats }>(`/follow/${userId}`);
-    return response.data;
+    const response = await apiService.post<FollowStats>(`/follow/${userId}`);
+    return response.data as any;
   },
 
   async unfollowUser(userId: string): Promise<FollowStats> {
-    const response = await apiService.delete<{ data: FollowStats }>(`/follow/${userId}`);
-    return response.data;
+    const response = await apiService.delete<FollowStats>(`/follow/${userId}`);
+    return response.data as any;
   },
 
   async getFollowStats(userId: string): Promise<FollowStats> {
-    const response = await apiService.get<{ data: FollowStats }>(`/follow/${userId}`);
-    return response.data;
+    const response = await apiService.get<FollowStats>(`/follow/${userId}`);
+    return response.data as any;
   },
 };
 

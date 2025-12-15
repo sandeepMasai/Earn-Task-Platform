@@ -372,10 +372,6 @@ const UploadPostScreen: React.FC = () => {
                   <VideoView
                     player={activeVideoPlayer}
                     style={styles.media}
-                    fullscreenOptions={{
-                      enterFullscreen: true,
-                      exitFullscreen: true,
-                    }}
                     allowsPictureInPicture
                     nativeControls={false}
                     contentFit="cover"

@@ -87,9 +87,9 @@ class ApiService {
     }
   }
 
-  async put<T>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.put(url, data);
+      const response = await this.client.put(url, data, config);
       // Backend returns { success: true, data: ... }
       if (response.data.success) {
         return { success: true, data: response.data.data };

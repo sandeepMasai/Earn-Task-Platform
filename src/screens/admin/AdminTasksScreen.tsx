@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
   Alert,
   FlatList,
-  SafeAreaView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { adminTaskService, AdminTask } from '@services/adminTaskService';
 import { formatCoins, formatDate } from '@utils/validation';

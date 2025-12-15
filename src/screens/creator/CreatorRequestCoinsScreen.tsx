@@ -496,7 +496,17 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     marginBottom: 16,
   },
+  buttonContainer: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
   submitButton: {
+    marginTop: 8,
+  },
+  submitHint: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textAlign: 'center',
     marginTop: 8,
   },
 });

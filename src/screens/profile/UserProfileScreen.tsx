@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
-import { followUser, unfollowUser } from '@store/slices/feedSlice';
+import { followUser, unfollowUser, deletePost } from '@store/slices/feedSlice';
 import { followService } from '@services/followService';
 import { postService } from '@services/postService';
 import { userService } from '@services/userService';

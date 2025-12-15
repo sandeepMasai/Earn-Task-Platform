@@ -3,8 +3,8 @@ import { User } from '@types';
 
 export const userService = {
   async getUserById(userId: string): Promise<User> {
-    const response = await apiService.get<{ data: { user: User } }>(`/auth/user/${userId}`);
-    return response.data.user;
+    const response = await apiService.get<{ user: User }>(`/auth/user/${userId}`);
+    return (response.data as any).user;
   },
 };
 

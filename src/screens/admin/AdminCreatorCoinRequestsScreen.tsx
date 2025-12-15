@@ -115,7 +115,7 @@ const AdminCreatorCoinRequestsScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
-          onPress: async (reason) => {
+          onPress: async (reason?: string) => {
             try {
               await adminService.rejectCreatorCoinRequest(requestId, reason || 'Payment proof verification failed');
               Toast.show({

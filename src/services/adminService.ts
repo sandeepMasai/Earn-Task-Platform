@@ -57,11 +57,11 @@ export interface AdminUser {
 
 export const adminService = {
   async getDashboardStats(): Promise<DashboardStats> {
-    const response = await apiService.get<{ data: any }>('/admin/dashboard');
-    const data = response.data;
+    const response = await apiService.get<any>('/admin/dashboard');
+    const data = response.data as any;
 
     // Transform _id to id for withdrawals and users
-    const recentWithdrawals = (data.recentWithdrawals || []).map((w: any) => ({
+    const recentWithdrawals = ((data.recentWithdrawals || []) as any[]).map((w: any) => ({
       ...w,
       id: w._id || w.id,
       user: {
@@ -70,13 +70,13 @@ export const adminService = {
       },
     }));
 
-    const recentUsers = (data.recentUsers || []).map((u: any) => ({
+    const recentUsers = ((data.recentUsers || []) as any[]).map((u: any) => ({
       ...u,
       id: u._id || u.id,
     }));
 
     return {
-      ...data,
+      stats: data.stats,
       recentWithdrawals,
       recentUsers,
     };
@@ -100,12 +100,10 @@ export const adminService = {
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-    const response = await apiService.get<{
-      data: { withdrawals: any[]; pagination: any };
-    }>(`/admin/payments?${queryParams.toString()}`);
+    const response = await apiService.get<{ withdrawals: any[]; pagination: any }>(`/admin/payments?${queryParams.toString()}`);
 
     // Transform _id to id
-    const withdrawals = response.data.withdrawals.map((w: any) => ({
+    const withdrawals = ((response.data as any).withdrawals || []).map((w: any) => ({
       ...w,
       id: w._id || w.id,
       user: {
@@ -116,7 +114,7 @@ export const adminService = {
 
     return {
       withdrawals,
-      pagination: response.data.pagination,
+      pagination: (response.data as any).pagination,
     };
   },
 
@@ -125,11 +123,11 @@ export const adminService = {
     status: 'pending' | 'approved' | 'rejected' | 'completed',
     rejectionReason?: string
   ): Promise<Withdrawal> {
-    const response = await apiService.put<{ data: { withdrawal: Withdrawal } }>(
+    const response = await apiService.put<{ withdrawal: Withdrawal }>(
       `/admin/payments/${id}/status`,
       { status, rejectionReason }
     );
-    return response.data.withdrawal;
+    return (response.data as any).withdrawal;
   },
 
   async downloadPayments(params?: {
@@ -142,10 +140,8 @@ export const adminService = {
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
 
-    const response = await apiService.get(`/admin/payments/download?${queryParams.toString()}`, {
-      responseType: 'text',
-    });
-    return response.data;
+    const response = await apiService.get<string>(`/admin/payments/download?${queryParams.toString()}`);
+    return response.data as string;
   },
 
   async getAllUsers(params?: {
@@ -168,19 +164,17 @@ export const adminService = {
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-    const response = await apiService.get<{
-      data: { users: any[]; pagination: any };
-    }>(`/admin/users?${queryParams.toString()}`);
+    const response = await apiService.get<{ users: any[]; pagination: any }>(`/admin/users?${queryParams.toString()}`);
 
     // Transform _id to id
-    const users = response.data.users.map((u: any) => ({
+    const users = ((response.data as any).users || []).map((u: any) => ({
       ...u,
       id: u._id || u.id,
     }));
 
     return {
       users,
-      pagination: response.data.pagination,
+      pagination: (response.data as any).pagination,
     };
   },
 
@@ -189,20 +183,19 @@ export const adminService = {
     withdrawals: Withdrawal[];
     transactions: any[];
   }> {
-    const response = await apiService.get<{
-      data: { user: AdminUser; withdrawals: Withdrawal[]; transactions: any[] };
-    }>(`/admin/users/${id}`);
-    return response.data;
+    const response = await apiService.get<{ user: AdminUser; withdrawals: Withdrawal[]; transactions: any[] }>(`/admin/users/${id}`);
+    return response.data as any;
   },
 
   async blockUser(id: string, isActive: boolean): Promise<AdminUser> {
-    const response = await apiService.put<{ data: { user: any } }>(
+    const response = await apiService.put<{ user: any }>(
       `/admin/users/${id}/block`,
       { isActive }
     );
+    const user = (response.data as any).user;
     return {
-      ...response.data.user,
-      id: response.data.user._id || response.data.user.id,
+      ...user,
+      id: user._id || user.id,
     };
   },
 
@@ -212,24 +205,25 @@ export const adminService = {
 
   // Coin Management
   async getCoinConfigs(): Promise<CoinConfig[]> {
-    const response = await apiService.get('/admin/coins');
-    return response.data.map((config: any) => ({
+    const response = await apiService.get<CoinConfig[]>('/admin/coins');
+    return ((response.data as any) || []).map((config: any) => ({
       ...config,
       id: config._id || config.id,
     }));
   },
 
   async updateCoinConfig(key: string, value: number): Promise<CoinConfig> {
-    const response = await apiService.put(`/admin/coins/${key}`, { value });
+    const response = await apiService.put<CoinConfig>(`/admin/coins/${key}`, { value });
+    const data = response.data as any;
     return {
-      ...response.data,
-      id: response.data._id || response.data.id,
+      ...data,
+      id: data._id || data.id,
     };
   },
 
   async updateCoinConfigs(configs: Array<{ key: string; value: number }>): Promise<CoinConfig[]> {
-    const response = await apiService.put('/admin/coins', { configs });
-    return response.data.map((config: any) => ({
+    const response = await apiService.put<CoinConfig[]>('/admin/coins', { configs });
+    return ((response.data as any) || []).map((config: any) => ({
       ...config,
       id: config._id || config.id,
     }));
@@ -241,8 +235,8 @@ export const adminService = {
     if (status) params.status = status;
     if (taskType) params.taskType = taskType;
 
-    const response = await apiService.get('/admin/task-submissions', { params });
-    return response.data.map((sub: any) => ({
+    const response = await apiService.get<TaskSubmission[]>('/admin/task-submissions', params);
+    return ((response.data as any) || []).map((sub: any) => ({
       ...sub,
       id: sub._id || sub.id,
       task: {
@@ -257,8 +251,8 @@ export const adminService = {
   },
 
   async getTaskSubmissionById(submissionId: string): Promise<TaskSubmission> {
-    const response = await apiService.get(`/admin/task-submissions/${submissionId}`);
-    const data = response.data;
+    const response = await apiService.get<TaskSubmission>(`/admin/task-submissions/${submissionId}`);
+    const data = response.data as any;
     return {
       ...data,
       id: data._id || data.id,
@@ -274,43 +268,43 @@ export const adminService = {
   },
 
   async approveTaskSubmission(submissionId: string): Promise<{ message: string; coins: number }> {
-    const response = await apiService.put(`/admin/task-submissions/${submissionId}/approve`);
-    return response.data;
+    const response = await apiService.put<{ message: string; coins: number }>(`/admin/task-submissions/${submissionId}/approve`);
+    return response.data as any;
   },
 
   async rejectTaskSubmission(submissionId: string, rejectionReason?: string): Promise<{ message: string }> {
-    const response = await apiService.put(`/admin/task-submissions/${submissionId}/reject`, {
+    const response = await apiService.put<{ message: string }>(`/admin/task-submissions/${submissionId}/reject`, {
       rejectionReason,
     });
-    return response.data;
+    return response.data as any;
   },
 
   // Creator Management
   async getCreatorRequests(status?: string): Promise<any[]> {
     const params = status ? { status } : {};
-    const response = await apiService.get('/admin/creator-requests', { params });
-    return response.data.map((creator: any) => ({
+    const response = await apiService.get<any[]>('/admin/creator-requests', params);
+    return ((response.data as any) || []).map((creator: any) => ({
       ...creator,
       id: creator._id || creator.id,
     }));
   },
 
   async approveCreator(creatorId: string): Promise<{ message: string }> {
-    const response = await apiService.put(`/admin/creator-requests/${creatorId}/approve`);
-    return response.data;
+    const response = await apiService.put<{ message: string }>(`/admin/creator-requests/${creatorId}/approve`);
+    return response.data as any;
   },
 
   async rejectCreator(creatorId: string, rejectionReason?: string): Promise<{ message: string }> {
-    const response = await apiService.put(`/admin/creator-requests/${creatorId}/reject`, {
+    const response = await apiService.put<{ message: string }>(`/admin/creator-requests/${creatorId}/reject`, {
       rejectionReason,
     });
-    return response.data;
+    return response.data as any;
   },
 
   async getCreatorCoinRequests(status?: string): Promise<any[]> {
     const params = status ? { status } : {};
-    const response = await apiService.get('/admin/creator-coin-requests', { params });
-    return response.data.map((request: any) => ({
+    const response = await apiService.get<any[]>('/admin/creator-coin-requests', params);
+    return ((response.data as any) || []).map((request: any) => ({
       ...request,
       id: request._id || request.id,
       creator: request.creator
@@ -323,15 +317,15 @@ export const adminService = {
   },
 
   async approveCreatorCoinRequest(requestId: string): Promise<{ message: string; creatorWallet: number; creator: { id: string; name: string; username: string } }> {
-    const response = await apiService.put(`/admin/creator-coin-requests/${requestId}/approve`);
-    return response.data;
+    const response = await apiService.put<{ message: string; creatorWallet: number; creator: { id: string; name: string; username: string } }>(`/admin/creator-coin-requests/${requestId}/approve`);
+    return response.data as any;
   },
 
   async rejectCreatorCoinRequest(requestId: string, rejectionReason: string): Promise<{ message: string }> {
-    const response = await apiService.put(`/admin/creator-coin-requests/${requestId}/reject`, {
+    const response = await apiService.put<{ message: string }>(`/admin/creator-coin-requests/${requestId}/reject`, {
       rejectionReason,
     });
-    return response.data;
+    return response.data as any;
   },
 
   // Withdrawal Settings
@@ -341,8 +335,13 @@ export const adminService = {
     updatedAt?: string;
     updatedBy?: string;
   }> {
-    const response = await apiService.get('/admin/withdrawal-settings');
-    return response.data;
+    const response = await apiService.get<{
+      minimumWithdrawalAmount: number;
+      withdrawalAmounts: number[];
+      updatedAt?: string;
+      updatedBy?: string;
+    }>('/admin/withdrawal-settings');
+    return response.data as any;
   },
 
   async updateWithdrawalSettings(data: {
@@ -354,8 +353,13 @@ export const adminService = {
     updatedAt?: string;
     updatedBy?: string;
   }> {
-    const response = await apiService.put('/admin/withdrawal-settings', data);
-    return response.data;
+    const response = await apiService.put<{
+      minimumWithdrawalAmount: number;
+      withdrawalAmounts: number[];
+      updatedAt?: string;
+      updatedBy?: string;
+    }>('/admin/withdrawal-settings', data);
+    return response.data as any;
   },
 };
 

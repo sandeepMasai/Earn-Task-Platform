@@ -30,7 +30,8 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -48,9 +49,27 @@
         {
           "cameraPermission": "The app accesses your camera to let you take photos for posts."
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      "expo-font"
     ],
     "scheme": "earntask",
-    "jsEngine": "hermes"
+    "jsEngine": "hermes",
+    "extra": {
+      "eas": {
+        "projectId": "6d164680-ea9b-4064-8c8c-7f178b907fd5"
+      }
+    },
+    "owner": "sk245444s-organization"
   }
 }

@@ -445,10 +445,6 @@ const PostCard: React.FC<PostCardProps> = ({
             <VideoView
               player={player!}
               style={styles.media}
-              fullscreenOptions={{
-                enterFullscreen: true,
-                exitFullscreen: true,
-              }}
               allowsPictureInPicture
               nativeControls={false}
               contentFit="cover"
@@ -754,11 +750,6 @@ const styles = StyleSheet.create({
   },
   followingButtonText: {
     color: '#000000',
-  },
-  followersText: {
-    fontSize: 11,
-    color: '#8E8E93',
-    marginLeft: 4,
   },
   moreButton: {
     padding: 4,

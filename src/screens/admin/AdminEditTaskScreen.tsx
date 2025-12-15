@@ -162,7 +162,7 @@ const AdminEditTaskScreen: React.FC = () => {
         if (videoDuration) {
           taskData.videoDuration = parseInt(videoDuration);
         } else {
-          taskData.videoDuration = null;
+          taskData.videoDuration = undefined;
         }
       }
 

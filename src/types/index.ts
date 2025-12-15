@@ -142,7 +142,7 @@ export interface WalletState {
 
 export interface Transaction {
     id: string;
-    type: 'earned' | 'withdrawn' | 'bonus';
+    type: 'earned' | 'withdrawn' | 'bonus' | 'referral';
     amount: number;
     description: string;
     createdAt: string;
@@ -277,6 +277,14 @@ export type RootStackParamList = {
     Comments: { postId: string };
     EditPost: { postId: string; currentCaption: string };
     UserProfile: { userId: string };
+    AdminWithdrawalManagement: undefined;
+    Settings: undefined;
+    TermsAndConditions: undefined;
+    RefundPolicy: undefined;
+    CommunityGuidelines: undefined;
+    AboutApp: undefined;
+    CreatorTaskSubmissions: undefined;
+    CreatorTaskSubmissionDetails: { submissionId: string };
 };
 
 export type MainTabParamList = {

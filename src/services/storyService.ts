@@ -13,11 +13,11 @@ const getMediaUrl = (url: string): string => {
 
 export const storyService = {
   async getStories(): Promise<StoryGroup[]> {
-    const response = await apiService.get<{ data: StoryGroup[] }>('/stories');
+    const response = await apiService.get<StoryGroup[]>('/stories');
     // Transform media URLs
-    return (response.data || []).map((group) => ({
+    return ((response.data as any) || []).map((group: StoryGroup) => ({
       ...group,
-      stories: group.stories.map((story) => ({
+      stories: group.stories.map((story: Story) => ({
         ...story,
         mediaUrl: getMediaUrl(story.mediaUrl),
         thumbnailUrl: story.thumbnailUrl ? getMediaUrl(story.thumbnailUrl) : undefined,
@@ -41,15 +41,15 @@ export const storyService = {
       formData.append('videoDuration', videoDuration.toString());
     }
 
-    const response = await apiService.post<{ data: Story }>('/stories', formData, {
+    const response = await apiService.post<Story>('/stories', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    const story = response.data;
+    const story = response.data as any;
     return {
       ...story,
-      id: (story as any)._id || story.id,
+      id: story._id || story.id,
       mediaUrl: getMediaUrl(story.mediaUrl),
       thumbnailUrl: story.thumbnailUrl ? getMediaUrl(story.thumbnailUrl) : undefined,
     };

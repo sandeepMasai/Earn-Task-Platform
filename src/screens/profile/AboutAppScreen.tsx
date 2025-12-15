@@ -13,8 +13,8 @@ import Constants from 'expo-constants';
 
 const AboutAppScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const appVersion = Constants.expoConfig?.version || Constants.manifest?.version || '1.0.0';
-  const appName = Constants.expoConfig?.name || Constants.manifest?.name || 'Earn Task Platform';
+  const appVersion = Constants.expoConfig?.version || (Constants.manifest as any)?.version || '1.0.0';
+  const appName = Constants.expoConfig?.name || (Constants.manifest as any)?.name || 'Earn Task Platform';
 
   return (
     <SafeAreaView style={styles.container}>

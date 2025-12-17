@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const generateToken = require('../utils/generateToken');
+const jwt = require('jsonwebtoken');
 const { getCoinValue } = require('../utils/coinHelper');
 const { getFileUrl } = require('../middleware/upload');
 
@@ -76,7 +77,15 @@ exports.signup = async (req, res) => {
       }
     }
 
-    const token = generateToken(user._id);
+    const accessToken = generateToken(user._id, {
+      expiresIn: process.env.JWT_EXPIRE || '1h',
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const refreshToken = generateToken(user._id, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
+      secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
 
     res.status(201).json({
       success: true,
@@ -95,7 +104,9 @@ exports.signup = async (req, res) => {
           isActive: user.isActive !== undefined ? user.isActive : true,
           createdAt: user.createdAt,
         },
-        token,
+        accessToken,
+        refreshToken,
+        expiresAt,
       },
     });
   } catch (error) {
@@ -129,7 +140,15 @@ exports.login = async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id);
+    const accessToken = generateToken(user._id, {
+      expiresIn: process.env.JWT_EXPIRE || '1h',
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const refreshToken = generateToken(user._id, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
+      secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
 
     res.json({
       success: true,
@@ -149,7 +168,9 @@ exports.login = async (req, res) => {
           isActive: user.isActive !== undefined ? user.isActive : true,
           createdAt: user.createdAt,
         },
-        token,
+        accessToken,
+        refreshToken,
+        expiresAt,
       },
     });
   } catch (error) {
@@ -428,5 +449,46 @@ exports.logout = async (req, res) => {
     success: true,
     message: 'Logged out successfully',
   });
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public (uses refresh token)
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, error: 'Refresh token required' });
+    }
+
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key'
+    );
+
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const accessToken = generateToken(user._id, {
+      expiresIn: process.env.JWT_EXPIRE || '1h',
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
+
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        expiresAt,
+      },
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: 'Invalid refresh token',
+    });
+  }
 };
 

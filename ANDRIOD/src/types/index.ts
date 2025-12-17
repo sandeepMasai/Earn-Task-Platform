@@ -28,6 +28,8 @@ export interface User {
 export interface AuthState {
     user: User | null;
     token: string | null;
+    refreshToken: string | null;
+    expiresAt: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
 }
@@ -229,12 +231,16 @@ export interface ApiResponse<T> {
 
 export interface LoginResponse {
     user: User;
-    token: string;
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
 }
 
 export interface SignupResponse {
     user: User;
-    token: string;
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
 }
 
 // Navigation Types

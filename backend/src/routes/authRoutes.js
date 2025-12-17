@@ -9,6 +9,7 @@ const {
   updateProfile,
   changePassword,
   logout,
+  refreshToken,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { upload } = require('../middleware/upload');
@@ -55,6 +56,7 @@ router.put('/instagram-id', protect, updateInstagramId);
 router.put('/profile', protect, upload.single('avatar'), updateProfile);
 router.put('/change-password', protect, changePassword);
 router.post('/logout', protect, logout);
+router.post('/refresh', refreshToken);
 
 module.exports = router;
 

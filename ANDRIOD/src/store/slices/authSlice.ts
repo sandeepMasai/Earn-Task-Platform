@@ -6,6 +6,8 @@ import { authStorage } from '@utils/storage';
 const initialState: AuthState = {
     user: null,
     token: null,
+    refreshToken: null,
+    expiresAt: null,
     isAuthenticated: false,
     isLoading: false,
 };
@@ -16,7 +18,11 @@ export const loginUser = createAsyncThunk(
     async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
         try {
             const response = await authService.login(email, password);
-            await authStorage.saveToken(response.token);
+            await authStorage.saveToken(response.accessToken);
+            await authStorage.saveRefreshToken(response.refreshToken);
+            if (response.expiresAt) {
+                await authStorage.saveExpiry(response.expiresAt);
+            }
             await authStorage.saveUser(response.user);
             return response;
         } catch (error: any) {
@@ -45,7 +51,11 @@ export const signupUser = createAsyncThunk(
     ) => {
         try {
             const response = await authService.signup(email, password, name, username, referralCode);
-            await authStorage.saveToken(response.token);
+            await authStorage.saveToken(response.accessToken);
+            await authStorage.saveRefreshToken(response.refreshToken);
+            if (response.expiresAt) {
+                await authStorage.saveExpiry(response.expiresAt);
+            }
             await authStorage.saveUser(response.user);
             return response;
         } catch (error: any) {
@@ -57,18 +67,21 @@ export const signupUser = createAsyncThunk(
 export const logoutUser = createAsyncThunk('auth/logout', async (_, { rejectWithValue }) => {
     try {
         await authService.logout();
-        await authStorage.clearAuth();
     } catch (error: any) {
-        await authStorage.clearAuth();
         return rejectWithValue(error.message);
     }
 });
 
 export const loadUser = createAsyncThunk('auth/loadUser', async (_, { rejectWithValue }) => {
     try {
-        const [token, user] = await Promise.all([authStorage.getToken(), authStorage.getUser()]);
+        const [token, refreshToken, expiresAt, user] = await Promise.all([
+            authStorage.getToken(),
+            authStorage.getRefreshToken(),
+            authStorage.getExpiry(),
+            authStorage.getUser(),
+        ]);
         if (token && user) {
-            return { token, user };
+            return { token, refreshToken, expiresAt, user };
         }
         return null;
     } catch (error: any) {
@@ -115,6 +128,8 @@ const authSlice = createSlice({
         clearAuth: (state) => {
             state.user = null;
             state.token = null;
+            state.refreshToken = null;
+            state.expiresAt = null;
             state.isAuthenticated = false;
         },
     },
@@ -127,7 +142,9 @@ const authSlice = createSlice({
             .addCase(loginUser.fulfilled, (state, action) => {
                 state.isLoading = false;
                 state.user = action.payload.user;
-                state.token = action.payload.token;
+                state.token = action.payload.accessToken;
+                state.refreshToken = action.payload.refreshToken;
+                state.expiresAt = action.payload.expiresAt;
                 state.isAuthenticated = true;
             })
             .addCase(loginUser.rejected, (state) => {
@@ -143,7 +160,9 @@ const authSlice = createSlice({
             .addCase(signupUser.fulfilled, (state, action) => {
                 state.isLoading = false;
                 state.user = action.payload.user;
-                state.token = action.payload.token;
+                state.token = action.payload.accessToken;
+                state.refreshToken = action.payload.refreshToken;
+                state.expiresAt = action.payload.expiresAt;
                 state.isAuthenticated = true;
             })
             .addCase(signupUser.rejected, (state) => {
@@ -156,11 +175,15 @@ const authSlice = createSlice({
             .addCase(logoutUser.fulfilled, (state) => {
                 state.user = null;
                 state.token = null;
+                state.refreshToken = null;
+                state.expiresAt = null;
                 state.isAuthenticated = false;
             })
             .addCase(logoutUser.rejected, (state) => {
                 state.user = null;
                 state.token = null;
+                state.refreshToken = null;
+                state.expiresAt = null;
                 state.isAuthenticated = false;
             });
 
@@ -174,6 +197,8 @@ const authSlice = createSlice({
                 if (action.payload) {
                     state.user = action.payload.user;
                     state.token = action.payload.token;
+                    state.refreshToken = action.payload.refreshToken || null;
+                    state.expiresAt = action.payload.expiresAt || null;
                     state.isAuthenticated = true;
                 }
             })

@@ -47,12 +47,36 @@ export const authStorage = {
     await storage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
   },
 
+  async saveRefreshToken(token: string): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
+  },
+
+  async saveExpiry(expiresAt: string): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.ACCESS_EXPIRES_AT, expiresAt);
+  },
+
   async getToken(): Promise<string | null> {
     return await storage.getItem<string>(STORAGE_KEYS.AUTH_TOKEN);
   },
 
+  async getRefreshToken(): Promise<string | null> {
+    return await storage.getItem<string>(STORAGE_KEYS.REFRESH_TOKEN);
+  },
+
+  async getExpiry(): Promise<string | null> {
+    return await storage.getItem<string>(STORAGE_KEYS.ACCESS_EXPIRES_AT);
+  },
+
   async removeToken(): Promise<void> {
     await storage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+  },
+
+  async removeRefreshToken(): Promise<void> {
+    await storage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  },
+
+  async removeExpiry(): Promise<void> {
+    await storage.removeItem(STORAGE_KEYS.ACCESS_EXPIRES_AT);
   },
 
   async saveUser(user: any): Promise<void> {
@@ -70,6 +94,8 @@ export const authStorage = {
   async clearAuth(): Promise<void> {
     await Promise.all([
       this.removeToken(),
+      this.removeRefreshToken(),
+      this.removeExpiry(),
       this.removeUser(),
     ]);
   },

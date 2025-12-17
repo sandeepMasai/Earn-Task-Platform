@@ -1,7 +1,3 @@
-// API Configuration
-// For Android emulator, use 'http://10.0.2.2:3000/api'
-// For iOS simulator, use 'http://localhost:3000/api'
-// For physical device, use your computer's IP address (e.g., 'http://192.168.1.5:3000/api')
 import { Platform } from 'react-native';
 
 const normalizeBaseURL = (host: string): string => {
@@ -31,20 +27,9 @@ const getBaseURL = (): string => {
     return url;
   }
 
-  if (__DEV__) {
-    if (Platform.OS === 'android') {
-      const host = getLocalIP();
-      const url = normalizeBaseURL(host);
-      console.log('🔗 API Base URL (Android dev):', url);
-      console.log('💡 Override with EXPO_PUBLIC_API_BASE_URL or EXPO_PUBLIC_LOCAL_IP if needed');
-      return url;
-    }
-    const url = normalizeBaseURL('localhost');
-    console.log('🔗 API Base URL (iOS/Web dev):', url);
-    return url;
-  }
-
-  return 'https://earn-task-platform.onrender.com/api';
+  // Always prefer hosted backend unless explicitly overridden
+  const hosted = 'https://earn-task-platform.onrender.com/api';
+  return hosted;
 };
 
 export const API_BASE_URL = getBaseURL();
@@ -88,6 +73,8 @@ export const VIDEO_WATCH_PERCENTAGE = 80; // 80% of video must be watched
 // Storage Keys
 export const STORAGE_KEYS = {
   AUTH_TOKEN: '@auth_token',
+  REFRESH_TOKEN: '@refresh_token',
+  ACCESS_EXPIRES_AT: '@access_expires_at',
   USER_DATA: '@user_data',
   ONBOARDING_COMPLETE: '@onboarding_complete',
   INSTAGRAM_ID: '@instagram_id',

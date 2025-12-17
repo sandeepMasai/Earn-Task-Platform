@@ -11,8 +11,14 @@ export const authService = {
         password,
       });
       console.log('✅ Login successful');
-      // Backend returns { user, token } in data
-      return response.data as LoginResponse;
+      const payload = response.data as LoginResponse;
+      await authStorage.saveToken(payload.accessToken);
+      await authStorage.saveRefreshToken(payload.refreshToken);
+      if (payload.expiresAt) {
+        await authStorage.saveExpiry(payload.expiresAt);
+      }
+      await authStorage.saveUser(payload.user);
+      return payload;
     } catch (error: any) {
       console.error('❌ Login error:', error.message);
       throw error;
@@ -36,8 +42,14 @@ export const authService = {
         referralCode,
       });
       console.log('✅ Signup successful');
-      // Backend returns { user, token } in data
-      return response.data as SignupResponse;
+      const payload = response.data as SignupResponse;
+      await authStorage.saveToken(payload.accessToken);
+      await authStorage.saveRefreshToken(payload.refreshToken);
+      if (payload.expiresAt) {
+        await authStorage.saveExpiry(payload.expiresAt);
+      }
+      await authStorage.saveUser(payload.user);
+      return payload;
     } catch (error: any) {
       console.error('❌ Signup error:', error.message);
       throw error;
@@ -46,6 +58,7 @@ export const authService = {
 
   async logout(): Promise<void> {
     await apiService.post('/auth/logout');
+    await authStorage.clearAuth();
   },
 
   async getCurrentUser(): Promise<User> {

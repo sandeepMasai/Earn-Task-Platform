@@ -31,12 +31,30 @@ class ApiService {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid
-          await authStorage.clearAuth();
-          // Don't log repeated 401 errors to reduce noise
-          if (!error.config?.url?.includes('/posts/feed')) {
-            console.log('API Error:', error);
+        if (error.response?.status === 401 && !error.config?._retry) {
+          const refreshToken = await authStorage.getRefreshToken();
+          if (refreshToken) {
+            try {
+              // mark retry to avoid infinite loop
+              (error.config as any)._retry = true;
+              const refreshResponse = await this.client.post('/auth/refresh', { refreshToken });
+              const data: any = refreshResponse.data?.data || refreshResponse.data;
+              if (data?.accessToken) {
+                await authStorage.saveToken(data.accessToken);
+                if (data.expiresAt) {
+                  await authStorage.saveExpiry(data.expiresAt);
+                }
+                // Retry original request with new token
+                const newConfig = { ...error.config };
+                newConfig.headers = newConfig.headers || {};
+                (newConfig.headers as any).Authorization = `Bearer ${data.accessToken}`;
+                return this.client(newConfig);
+              }
+            } catch (refreshError) {
+              await authStorage.clearAuth();
+            }
+          } else {
+            await authStorage.clearAuth();
           }
         } else {
           console.log('API Error:', error);

@@ -78,6 +78,58 @@ exports.getFeed = async (req, res) => {
   }
 };
 
+// @desc    Get current user's posts
+// @route   GET /api/posts/me
+// @access  Private
+exports.getMyPosts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [posts, totalPosts] = await Promise.all([
+      Post.find({ isActive: true, user: req.user._id })
+        .populate('user', 'name username avatar')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments({ isActive: true, user: req.user._id }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        posts: posts.map((post) => ({
+          id: post._id.toString(),
+          userId: post.user._id.toString(),
+          userName: post.user.name,
+          userAvatar: post.user.avatar || null,
+          type: post.type,
+          imageUrl: post.imageUrl,
+          videoUrl: post.videoUrl,
+          documentUrl: post.documentUrl,
+          documentType: post.documentType,
+          videoDuration: post.videoDuration,
+          thumbnailUrl: post.thumbnailUrl,
+          caption: post.caption,
+          likes: post.likes.length,
+          comments: post.comments.length,
+          isLiked: post.isLikedByUser(req.user._id),
+          followersCount: post.user.followers ? post.user.followers.length : 0,
+          isFollowing: true, // the owner implicitly follows themselves
+          createdAt: post.createdAt,
+        })),
+        hasMore: skip + posts.length < totalPosts,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Upload post
 // @route   POST /api/posts
 // @access  Private

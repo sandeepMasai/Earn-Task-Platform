@@ -16,6 +16,26 @@ const getImageUrl = (imageUrl: string): string => {
 };
 
 export const postService = {
+  async getMyPosts(page: number = 1, limit: number = 10): Promise<{ posts: Post[]; hasMore: boolean }> {
+    const response = await apiService.get<{ data: { posts: any[]; hasMore: boolean } }>('/posts/me', {
+      page,
+      limit,
+    });
+    const data = response.data as any;
+    const posts = (data.posts || []).map((post: any) => ({
+      ...post,
+      id: post._id || post.id,
+      userId: post.userId || post.user?._id || post.userId,
+      userAvatar: post.userAvatar ? getImageUrl(post.userAvatar) : undefined,
+      imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+      videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+      documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+      thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
+      isFollowing: post.isFollowing !== undefined ? post.isFollowing : true,
+      followersCount: post.followersCount !== undefined ? post.followersCount : 0,
+    }));
+    return { posts, hasMore: data.hasMore || false };
+  },
   async getFeed(page: number = 1, limit: number = 10): Promise<{ posts: Post[]; hasMore: boolean }> {
     const response = await apiService.get<{ data: { posts: any[]; hasMore: boolean } }>('/posts/feed', {
       page,

@@ -285,6 +285,7 @@ export type RootStackParamList = {
     AboutApp: undefined;
     CreatorTaskSubmissions: undefined;
     CreatorTaskSubmissionDetails: { submissionId: string };
+    MyPosts: undefined;
 };
 
 export type MainTabParamList = {

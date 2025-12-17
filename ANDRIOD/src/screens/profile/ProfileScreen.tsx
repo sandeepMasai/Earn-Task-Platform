@@ -119,6 +119,11 @@ const ProfileScreen: React.FC = () => {
       onPress: () => navigation.navigate(ROUTES.EDIT_PROFILE),
     },
     {
+      icon: 'albums-outline',
+      title: 'My Posts',
+      onPress: () => navigation.navigate(ROUTES.MY_POSTS),
+    },
+    {
       icon: 'settings-outline',
       title: 'Account Settings',
       onPress: () => navigation.navigate(ROUTES.SETTINGS),

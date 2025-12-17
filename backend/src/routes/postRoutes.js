@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getFeed,
+  getMyPosts,
   uploadPost,
   likePost,
   unlikePost,
@@ -15,6 +16,7 @@ const { protect } = require('../middleware/auth');
 const { upload } = require('../middleware/upload');
 
 router.get('/feed', protect, getFeed);
+router.get('/me', protect, getMyPosts);
 router.post('/', protect, upload.single('image'), uploadPost);
 router.post('/:id/like', protect, likePost);
 router.post('/:id/unlike', protect, unlikePost);

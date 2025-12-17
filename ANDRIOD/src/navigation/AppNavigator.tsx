@@ -54,6 +54,7 @@ import EditPostScreen from '@screens/feed/EditPostScreen';
 
 // User Profile Screen
 import UserProfileScreen from '@screens/profile/UserProfileScreen';
+import MyPostsScreen from '@screens/profile/MyPostsScreen';
 
 // Creator Screens
 import CreatorRegisterScreen from '@screens/creator/CreatorRegisterScreen';
@@ -248,6 +249,11 @@ const AppNavigator: React.FC = () => {
                             name={ROUTES.USER_PROFILE}
                             component={UserProfileScreen}
                             options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name={ROUTES.MY_POSTS}
+                            component={MyPostsScreen}
+                            options={{ headerShown: true, title: 'My Posts' }}
                         />
                         <Stack.Screen
                             name={ROUTES.CREATOR_REGISTER}

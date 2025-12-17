@@ -165,6 +165,7 @@ export const ROUTES = {
 
   // User Profile
   USER_PROFILE: 'UserProfile',
+  MY_POSTS: 'MyPosts',
 } as const;
 
 // Error Messages

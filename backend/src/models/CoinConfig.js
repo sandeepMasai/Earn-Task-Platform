@@ -41,8 +41,5 @@ const CoinConfigSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Ensure only one document per key
-CoinConfigSchema.index({ key: 1 }, { unique: true });
-
 module.exports = mongoose.model('CoinConfig', CoinConfigSchema);
 

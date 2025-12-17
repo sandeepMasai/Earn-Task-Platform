@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { authStorage } from '@utils/storage';
 import { LoginResponse, SignupResponse, User } from '@types';
 
 export const authService = {
@@ -82,7 +83,11 @@ export const authService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data.user;
+
+    // ApiService unwraps to { success, data }, so handle both shapes defensively
+    const updatedUser = (response as any).data?.user ?? (response as any).data ?? response;
+    await authStorage.saveUser(updatedUser as User);
+    return updatedUser as User;
   },
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {

@@ -108,6 +108,10 @@ const authSlice = createSlice({
                 state.user.coins = action.payload;
             }
         },
+        setUser: (state, action: PayloadAction<User | null>) => {
+            state.user = action.payload;
+            state.isAuthenticated = !!action.payload;
+        },
         clearAuth: (state) => {
             state.user = null;
             state.token = null;
@@ -186,6 +190,6 @@ const authSlice = createSlice({
     },
 });
 
-export const { updateUserCoins, clearAuth } = authSlice.actions;
+export const { updateUserCoins, setUser, clearAuth } = authSlice.actions;
 export default authSlice.reducer;
 

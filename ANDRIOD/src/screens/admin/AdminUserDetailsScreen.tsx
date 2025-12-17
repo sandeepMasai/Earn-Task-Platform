@@ -168,8 +168,11 @@ const AdminUserDetailsScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Withdrawal Requests ({withdrawals.length})</Text>
         {withdrawals.length > 0 ? (
-          withdrawals.map((withdrawal) => (
-            <View key={withdrawal.id} style={styles.withdrawalCard}>
+          withdrawals.map((withdrawal, idx) => (
+            <View
+              key={withdrawal.id || (withdrawal as any)._id || `withdrawal-${idx}`}
+              style={styles.withdrawalCard}
+            >
               <View style={styles.withdrawalHeader}>
                 <Text style={styles.withdrawalAmount}>{formatCoins(withdrawal.amount)}</Text>
                 <View
@@ -216,8 +219,11 @@ const AdminUserDetailsScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Transactions ({transactions.length})</Text>
         {transactions.length > 0 ? (
-          transactions.slice(0, 20).map((transaction) => (
-            <View key={transaction.id} style={styles.transactionCard}>
+          transactions.slice(0, 20).map((transaction, idx) => (
+            <View
+              key={transaction.id || (transaction as any)._id || `tx-${idx}`}
+              style={styles.transactionCard}
+            >
               <View style={styles.transactionHeader}>
                 <View style={styles.transactionInfo}>
                   <Text style={styles.transactionDescription}>{transaction.description}</Text>

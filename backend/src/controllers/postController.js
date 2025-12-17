@@ -23,14 +23,18 @@ exports.getFeed = async (req, res) => {
       .limit(limit);
 
     const totalPosts = await Post.countDocuments({ isActive: true });
-    const hasMore = skip + posts.length < totalPosts;
+    // Drop posts whose user record no longer exists to avoid null derefs
+    const filteredPosts = posts.filter((post) => post.user);
+    const hasMore = skip + filteredPosts.length < totalPosts;
 
     res.json({
       success: true,
       data: {
         posts: await Promise.all(
-          posts.map(async (post) => {
-            const postOwner = await User.findById(post.user._id).select('followers');
+          filteredPosts.map(async (post) => {
+            const postOwner = post.user
+              ? await User.findById(post.user._id).select('followers')
+              : null;
             // Check if current user is following the post owner
             // The post owner's followers array contains users who follow them
             // But we need to check if current user is following the post owner

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl, Image, Linking, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
@@ -12,6 +12,14 @@ const ProfileScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const [refreshing, setRefreshing] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState<number>(0);
+
+  // Bump cache-buster whenever avatar changes so UI refreshes immediately
+  useEffect(() => {
+    if (user?.avatar) {
+      setAvatarVersion(Date.now());
+    }
+  }, [user?.avatar]);
 
   // Refresh user data when screen comes into focus
   useFocusEffect(
@@ -93,17 +101,31 @@ const ProfileScreen: React.FC = () => {
   // Helper to get full avatar URL
   const getAvatarUrl = (avatar: string | null | undefined): string | null => {
     if (!avatar) return null;
+    const cacheBust = avatarVersion ? `?v=${avatarVersion}` : '';
     if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-      return avatar;
+      return `${avatar}${cacheBust}`;
     }
     if (avatar.startsWith('/uploads/')) {
       const baseUrl = API_BASE_URL.replace('/api', '');
-      return `${baseUrl}${avatar}`;
+      return `${baseUrl}${avatar}${cacheBust}`;
     }
-    return avatar;
+    return `${avatar}${cacheBust}`;
   };
 
-  const menuItems = [
+  const accountMenuItems = [
+    {
+      icon: 'person-outline',
+      title: 'Edit Profile',
+      onPress: () => navigation.navigate(ROUTES.EDIT_PROFILE),
+    },
+    {
+      icon: 'settings-outline',
+      title: 'Account Settings',
+      onPress: () => navigation.navigate(ROUTES.SETTINGS),
+    },
+  ];
+
+  const mainMenuItems = [
     {
       icon: 'cash-outline',
       title: 'Earning History',
@@ -130,20 +152,29 @@ const ProfileScreen: React.FC = () => {
       ]
       : []),
     {
-      icon: 'settings-outline',
-      title: 'Settings',
-      onPress: () => navigation.navigate(ROUTES.SETTINGS),
-    },
-    {
       icon: 'help-circle-outline',
       title: 'Help & Support',
       onPress: handleHelpSupport,
     },
   ];
 
-  // Show additional creator options if user is an approved creator
-  const creatorMenuItems = [];
-  if (user?.isCreator && user?.creatorStatus === 'approved') {
+  // Creator entry points live under the Profile tab
+  const creatorMenuItems: any[] = [];
+  if (!user?.isCreator || user?.creatorStatus !== 'approved') {
+    creatorMenuItems.push(
+      {
+        icon: 'star-outline',
+        title: 'Become a Creator',
+        onPress: () => navigation.navigate(ROUTES.CREATOR_REGISTER),
+        color: '#FF9500',
+      },
+      {
+        icon: 'time-outline',
+        title: 'My Creator Request',
+        onPress: () => navigation.navigate(ROUTES.CREATOR_REQUEST_HISTORY),
+      },
+    );
+  } else {
     creatorMenuItems.push(
       {
         icon: 'grid-outline',
@@ -159,7 +190,7 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
-  const allMenuItems = [...menuItems, ...creatorMenuItems];
+  const allMenuItems = [...accountMenuItems, ...mainMenuItems, ...creatorMenuItems];
 
   return (
     <ScrollView

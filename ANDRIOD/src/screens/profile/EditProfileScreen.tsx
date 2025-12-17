@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
-import { refreshUser } from '@store/slices/authSlice';
+import { refreshUser, setUser } from '@store/slices/authSlice';
 import { authService } from '@services/authService';
 import { authStorage } from '@utils/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -188,6 +188,8 @@ const EditProfileScreen: React.FC = () => {
         username: username.trim(),
       };
 
+      let updatedUser: any = null;
+
       // Handle avatar upload
       if (avatar && avatar.startsWith('file://')) {
         // Create FormData for file upload
@@ -231,10 +233,17 @@ const EditProfileScreen: React.FC = () => {
         if (!result.success) {
           throw new Error(result.error || result.message || 'Failed to update profile');
         }
+        updatedUser = result.data?.user ?? result.user ?? null;
       } else {
         // Update without file upload
         if (avatar) profileData.avatar = avatar;
-        await authService.updateProfile(profileData);
+        updatedUser = await authService.updateProfile(profileData);
+      }
+
+      // Persist latest user locally so avatar/name updates apply immediately
+      if (updatedUser) {
+        await authStorage.saveUser(updatedUser);
+        dispatch(setUser(updatedUser));
       }
 
       // Change password if provided
@@ -449,6 +458,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    marginTop: 20,
   },
   title: {
     fontSize: 18,

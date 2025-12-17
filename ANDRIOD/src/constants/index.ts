@@ -4,30 +4,47 @@
 // For physical device, use your computer's IP address (e.g., 'http://192.168.1.5:3000/api')
 import { Platform } from 'react-native';
 
-// Get local IP for network access
+const normalizeBaseURL = (host: string): string => {
+  const trimmed = host.replace(/\/+$/, '');
+  return trimmed.includes('://') ? `${trimmed}/api` : `http://${trimmed}:3000/api`;
+};
+
+const getEnvBaseURL = (): string => {
+  if (typeof process === 'undefined' || !process.env) return '';
+  return (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || '').trim();
+};
+
+// Get local IP for network access (override with EXPO_PUBLIC_LOCAL_IP or API_BASE_URL/EXPO_PUBLIC_API_BASE_URL)
 const getLocalIP = (): string => {
-  // For Android emulator, try 10.0.2.2 first (emulator's localhost)
-  // If that doesn't work, use actual network IP
-  return '192.168.1.5'; // Update this to your computer's IP if different
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_LOCAL_IP) {
+    return process.env.EXPO_PUBLIC_LOCAL_IP;
+  }
+  // Default to your machine's LAN IP so physical devices can reach the backend; override if different
+  return '192.168.1.2';
 };
 
 const getBaseURL = (): string => {
-  if (__DEV__) {
-    // Android emulator: Try 10.0.2.2 first, fallback to network IP
-    if (Platform.OS === 'android') {
-      // Try network IP first (more reliable)
-      const networkIP = getLocalIP();
-      const url = `http://${networkIP}:3000/api`;
-      console.log('🔗 API Base URL (Android):', url);
-      console.log('💡 If this doesn\'t work, try: http://10.0.2.2:3000/api');
-      return url;
-    }
-    // iOS simulator and web can use localhost
-    const url = 'http://localhost:3000/api';
-    console.log('🔗 API Base URL (iOS/Web):', url);
+  const envBase = getEnvBaseURL();
+  if (envBase) {
+    const url = normalizeBaseURL(envBase);
+    console.log('🔗 API Base URL (env override):', url);
     return url;
   }
-  return 'https://api.earntaskplatform.com/api';
+
+  if (__DEV__) {
+    if (Platform.OS === 'android') {
+      const host = getLocalIP();
+      const url = normalizeBaseURL(host);
+      console.log('🔗 API Base URL (Android dev):', url);
+      console.log('💡 Override with EXPO_PUBLIC_API_BASE_URL or EXPO_PUBLIC_LOCAL_IP if needed');
+      return url;
+    }
+    const url = normalizeBaseURL('localhost');
+    console.log('🔗 API Base URL (iOS/Web dev):', url);
+    return url;
+  }
+
+  return 'https://earn-task-platform.onrender.com/api';
 };
 
 export const API_BASE_URL = getBaseURL();

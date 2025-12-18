@@ -234,10 +234,10 @@ Create a `.env` file (optional) for environment-specific configurations.
 2. **Module resolution errors**: Check `babel.config.js` path aliases
 3. **Type errors**: Run `npx tsc --noEmit` to check TypeScript errors
 
-## Next Steps
+
 
 1. Connect to backend API
-2. Add image assets to `assets/` folder
+2. Add image assets to
 3. Implement deep linking
 4. Add push notifications
 5. Add analytics

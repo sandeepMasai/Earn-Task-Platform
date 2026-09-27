@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { validateId } = require('../middleware/validateRequest');
+router.param('id', validateId);
+router.param('userId', validateId);
 const {
   getTasks,
   getTaskById,
@@ -11,6 +14,8 @@ const {
 const { protect } = require('../middleware/auth');
 const { upload } = require('../middleware/upload');
 
+router.post('/:id/watch/start', protect, require('../controllers/watchController').start);
+router.post('/:id/watch/heartbeat', protect, require('../controllers/watchController').heartbeat);
 router.get('/', protect, getTasks);
 router.get('/:id', protect, getTaskById);
 router.post('/:id/complete', protect, completeTask);

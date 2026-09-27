@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const User = require('../models/User');
 const Withdrawal = require('../models/Withdrawal');
 const Transaction = require('../models/Transaction');
@@ -94,10 +95,7 @@ exports.getDashboardStats = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -130,10 +128,7 @@ exports.getAllPayments = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -142,69 +137,9 @@ exports.getAllPayments = async (req, res) => {
 // @access  Private/Admin
 exports.updatePaymentStatus = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status, rejectionReason } = req.body;
-
-    if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid status. Must be: pending, approved, rejected, or completed',
-      });
-    }
-
-    const withdrawal = await Withdrawal.findById(id).populate('user');
-
-    if (!withdrawal) {
-      return res.status(404).json({
-        success: false,
-        error: 'Withdrawal request not found',
-      });
-    }
-
-    // If approving, deduct coins from user
-    if (status === 'approved' && withdrawal.status === 'pending') {
-      const user = await User.findById(withdrawal.user._id);
-      if (user.coins < withdrawal.amount) {
-        return res.status(400).json({
-          success: false,
-          error: 'User does not have enough coins',
-        });
-      }
-      user.coins -= withdrawal.amount;
-      user.totalWithdrawn += withdrawal.amount;
-      await user.save();
-    }
-
-    // If rejecting after approval, refund coins
-    if (status === 'rejected' && withdrawal.status === 'approved') {
-      const user = await User.findById(withdrawal.user._id);
-      user.coins += withdrawal.amount;
-      user.totalWithdrawn -= withdrawal.amount;
-      await user.save();
-    }
-
-    withdrawal.status = status;
-    if (status === 'approved' || status === 'completed') {
-      withdrawal.processedAt = new Date();
-    }
-    if (status === 'rejected' && rejectionReason) {
-      withdrawal.rejectionReason = rejectionReason;
-    }
-
-    await withdrawal.save();
-
-    res.json({
-      success: true,
-      data: {
-        withdrawal: await Withdrawal.findById(id).populate('user', 'name email username'),
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    const withdrawal = await require('../services/withdrawals').review(req.params.id, req.body.status, req.body.rejectionReason);
+    res.json({ success: true, data: { withdrawal } });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 // @desc    Get all users
@@ -219,11 +154,12 @@ exports.getAllUsers = async (req, res) => {
       query.isActive = isActive === 'true';
     }
 
+    const literalSearch = search ? search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } },
+        { name: { $regex: literalSearch, $options: 'i' } },
+        { email: { $regex: literalSearch, $options: 'i' } },
+        { username: { $regex: literalSearch, $options: 'i' } },
       ];
     }
 
@@ -248,10 +184,7 @@ exports.getAllUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -283,10 +216,7 @@ exports.getUserDetails = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -324,10 +254,7 @@ exports.blockUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -354,20 +281,25 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    // Delete user and related data
-    await Withdrawal.deleteMany({ user: id });
-    await Transaction.deleteMany({ user: id });
-    await User.findByIdAndDelete(id);
+    await require('mongoose').connection.transaction(async session => {
+      const ownedTasks = await Task.find({ createdBy: id }).select('_id').session(session);
+      await TaskSubmission.deleteMany({ $or: [{ user: id }, { task: { $in: ownedTasks.map(t => t._id) } }] }, { session });
+      await Task.deleteMany({ createdBy: id }, { session });
+      await Post.deleteMany({ user: id }, { session });
+      await require('../models/Story').deleteMany({ user: id }, { session });
+      await CreatorCoinRequest.deleteMany({ creator: id }, { session });
+      await User.updateMany({}, { $pull: { followers: id, following: id } }, { session });
+      await Withdrawal.deleteMany({ user: id }, { session });
+      await Transaction.deleteMany({ user: id }, { session });
+      await User.findByIdAndDelete(id, { session });
+    });
 
     res.json({
       success: true,
       message: 'User deleted successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -398,16 +330,20 @@ exports.downloadPayments = async (req, res) => {
     const csvRows = withdrawals.map((w) => {
       return [
         w._id,
-        w.user.name,
-        w.user.email,
-        w.user.username,
+        w.user?.name || 'Deleted user',
+        w.user?.email || '',
+        w.user?.username || '',
         w.amount,
         w.status,
         w.paymentMethod,
         w.accountDetails,
         w.createdAt.toISOString(),
         w.processedAt ? w.processedAt.toISOString() : '',
-      ].join(',');
+      ].map(value => {
+        let text = String(value ?? '');
+        if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+      }).join(',');
     });
 
     const csv = csvHeader + csvRows.join('\n');
@@ -416,10 +352,7 @@ exports.downloadPayments = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=payments-${Date.now()}.csv`);
     res.send(csv);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -451,7 +384,7 @@ exports.getCoinConfigs = async (req, res) => {
       data: configs,
     });
   } catch (error) {
-    console.error('Error getting coin configs:', error);
+    console.error('Error getting coin configs:');
     res.status(500).json({
       success: false,
       error: 'Failed to get coin configurations',
@@ -467,7 +400,7 @@ exports.updateCoinConfig = async (req, res) => {
     const { key } = req.params;
     const { value } = req.body;
 
-    if (value === undefined || value < 0) {
+    if (!CoinConfig.schema.path('key').enumValues.includes(key) || typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
       return res.status(400).json({
         success: false,
         error: 'Valid coin value is required',
@@ -478,10 +411,11 @@ exports.updateCoinConfig = async (req, res) => {
       { key },
       {
         value,
+        label: key.replace(/_/g, ' '),
         updatedBy: req.user.id,
         updatedAt: new Date(),
       },
-      { new: true, upsert: true }
+      { new: true, upsert: true, runValidators: true }
     );
 
     // Clear cache so new values are used immediately
@@ -493,7 +427,7 @@ exports.updateCoinConfig = async (req, res) => {
       message: 'Coin configuration updated successfully',
     });
   } catch (error) {
-    console.error('Error updating coin config:', error);
+    console.error('Error updating coin config:');
     res.status(500).json({
       success: false,
       error: 'Failed to update coin configuration',
@@ -508,7 +442,7 @@ exports.updateCoinConfigs = async (req, res) => {
   try {
     const { configs } = req.body;
 
-    if (!Array.isArray(configs)) {
+    if (!Array.isArray(configs) || configs.some(c => !c || !CoinConfig.schema.path('key').enumValues.includes(c.key) || typeof c.value !== 'number' || !Number.isSafeInteger(c.value) || c.value < 0)) {
       return res.status(400).json({
         success: false,
         error: 'Configs must be an array',
@@ -523,10 +457,11 @@ exports.updateCoinConfigs = async (req, res) => {
         { key },
         {
           value,
+          label: key.replace(/_/g, ' '),
           updatedBy: req.user.id,
           updatedAt: new Date(),
         },
-        { new: true, upsert: true }
+        { new: true, upsert: true, runValidators: true }
       );
     });
 
@@ -541,7 +476,7 @@ exports.updateCoinConfigs = async (req, res) => {
       message: 'Coin configurations updated successfully',
     });
   } catch (error) {
-    console.error('Error updating coin configs:', error);
+    console.error('Error updating coin configs:');
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update coin configurations',
@@ -611,10 +546,7 @@ exports.getTaskSubmissions = async (req, res) => {
       data: formattedSubmissions,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -670,10 +602,7 @@ exports.getTaskSubmissionById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -682,90 +611,9 @@ exports.getTaskSubmissionById = async (req, res) => {
 // @access  Private/Admin
 exports.approveTaskSubmission = async (req, res) => {
   try {
-    const submission = await TaskSubmission.findById(req.params.id)
-      .populate('task')
-      .populate('user');
-
-    if (!submission) {
-      return res.status(404).json({
-        success: false,
-        error: 'Submission not found',
-      });
-    }
-
-    // Admin should only approve non-creator tasks
-    const task = await Task.findById(submission.task._id);
-    if (task.isCreatorTask) {
-      return res.status(400).json({
-        success: false,
-        error: 'This is a creator task. Please use the creator approval endpoint.',
-      });
-    }
-
-    if (submission.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        error: 'Submission already approved',
-      });
-    }
-
-    // Update submission status
-    submission.status = 'approved';
-    submission.reviewedBy = req.user._id;
-    submission.reviewedAt = new Date();
-    await submission.save();
-
-    // Mark task as completed for user
-    // Reuse the task variable already fetched above
-    if (!task.isCompletedByUser(submission.user._id)) {
-      task.completedBy.push({
-        user: submission.user._id,
-        completedAt: new Date(),
-      });
-
-      // For creator tasks, update coins used and check if budget is exhausted
-      if (task.isCreatorTask) {
-        const rewardAmount = task.rewardPerUser || task.coins;
-        task.coinsUsed = (task.coinsUsed || 0) + rewardAmount;
-
-        // Check if budget is exhausted
-        if (task.coinsUsed >= task.totalBudget || task.completedBy.length >= task.maxUsers) {
-          task.isActive = false;
-        }
-      }
-
-      await task.save();
-    }
-
-    // Add coins to user
-    const rewardAmount = task.isCreatorTask ? (task.rewardPerUser || task.coins) : task.coins;
-    const user = await User.findById(submission.user._id);
-    user.coins += rewardAmount;
-    user.totalEarned += rewardAmount;
-    await user.save();
-
-    // Create transaction
-    await Transaction.create({
-      user: submission.user._id,
-      type: 'earned',
-      amount: rewardAmount,
-      description: `Completed task: ${task.title}`,
-      task: task._id,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        message: 'Task approved and coins credited successfully',
-        coins: task.coins,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    const data = await require('../services/rewards').review(req.params.id, req.user, 'approved', req.body.rejectionReason, false);
+    res.json({ success: true, data });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 // @desc    Reject task submission
@@ -773,43 +621,9 @@ exports.approveTaskSubmission = async (req, res) => {
 // @access  Private/Admin
 exports.rejectTaskSubmission = async (req, res) => {
   try {
-    const { rejectionReason } = req.body;
-
-    const submission = await TaskSubmission.findById(req.params.id);
-
-    if (!submission) {
-      return res.status(404).json({
-        success: false,
-        error: 'Submission not found',
-      });
-    }
-
-    if (submission.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot reject an approved submission',
-      });
-    }
-
-    // Update submission status
-    submission.status = 'rejected';
-    submission.rejectionReason = rejectionReason || 'Proof verification failed';
-    submission.reviewedBy = req.user._id;
-    submission.reviewedAt = new Date();
-    await submission.save();
-
-    res.json({
-      success: true,
-      data: {
-        message: 'Task submission rejected',
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    const data = await require('../services/rewards').review(req.params.id, req.user, 'rejected', req.body.rejectionReason, false);
+    res.json({ success: true, data });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 
@@ -855,10 +669,7 @@ exports.getCreatorRequests = async (req, res) => {
       data: formattedCreators,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -903,10 +714,7 @@ exports.approveCreator = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -933,6 +741,7 @@ exports.rejectCreator = async (req, res) => {
 
     user.creatorStatus = 'rejected';
     user.isCreator = false;
+    if (user.role === 'creator') user.role = 'user';
     await user.save();
 
     res.json({
@@ -942,10 +751,7 @@ exports.rejectCreator = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -996,10 +802,7 @@ exports.getCreatorCoinRequests = async (req, res) => {
       data: formattedRequests,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -1008,65 +811,23 @@ exports.getCreatorCoinRequests = async (req, res) => {
 // @access  Private/Admin
 exports.approveCreatorCoinRequest = async (req, res) => {
   try {
-    const request = await CreatorCoinRequest.findById(req.params.id).populate('creator');
-
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        error: 'Request not found',
-      });
-    }
-
-    if (request.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        error: 'Request already approved',
-      });
-    }
-
-    // Add coins to creator wallet
-    const creator = await User.findById(request.creator._id);
-    if (!creator) {
-      return res.status(404).json({
-        success: false,
-        error: 'Creator not found',
-      });
-    }
-
-    creator.creatorWallet += request.coins;
-    await creator.save();
-
-    // Update request status with review information
-    request.status = 'approved';
-    request.reviewedBy = req.user._id;
-    request.reviewedAt = new Date();
-    await request.save();
-
-    // Log the approval action (history is saved in the request document)
-    res.json({
-      success: true,
-      data: {
-        message: `Coin request approved. ${request.coins} coins added to ${creator.name}'s (ID: ${creator._id}) wallet`,
-        creatorWallet: creator.creatorWallet,
-        creator: {
-          id: creator._id,
-          name: creator.name,
-          username: creator.username,
-        },
-        reviewedBy: {
-          id: req.user._id,
-          name: req.user.name,
-          username: req.user.username,
-        },
-        reviewedAt: request.reviewedAt,
-      },
+    const data = await require('mongoose').connection.transaction(async session => {
+      const request = await CreatorCoinRequest.findById(req.params.id).session(session);
+      if (!request) throw require('../utils/httpError')(404, 'Request not found');
+      if (request.status !== 'pending') throw require('../utils/httpError')(400, 'Only pending requests can be reviewed');
+      const creator = await User.findById(request.creator).session(session);
+      if (!creator) throw require('../utils/httpError')(404, 'Creator not found');
+      creator.creatorWallet += request.coins;
+      await creator.save({ session });
+      request.status = 'approved';
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
+      request.rejectionReason = null;
+      await request.save({ session });
+      return { message: 'Coin request approved', creatorWallet: creator.creatorWallet, reviewedAt: request.reviewedAt };
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    res.json({ success: true, data });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 // @desc    Reject creator coin request
@@ -1074,64 +835,22 @@ exports.approveCreatorCoinRequest = async (req, res) => {
 // @access  Private/Admin
 exports.rejectCreatorCoinRequest = async (req, res) => {
   try {
-    const { rejectionReason } = req.body;
+    const data = await require('mongoose').connection.transaction(async session => {
+      const request = await CreatorCoinRequest.findById(req.params.id).session(session);
+      if (!request) throw require('../utils/httpError')(404, 'Request not found');
+      if (request.status !== 'pending') throw require('../utils/httpError')(400, 'Only pending requests can be reviewed');
+      const creator = await User.findById(request.creator).session(session);
+      if (!creator) throw require('../utils/httpError')(404, 'Creator not found');
 
-    const request = await CreatorCoinRequest.findById(req.params.id);
-
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        error: 'Request not found',
-      });
-    }
-
-    if (request.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot reject an approved request',
-      });
-    }
-
-    // Get creator info for history
-    const creator = await User.findById(request.creator._id);
-    if (!creator) {
-      return res.status(404).json({
-        success: false,
-        error: 'Creator not found',
-      });
-    }
-
-    request.status = 'rejected';
-    request.rejectionReason = rejectionReason || 'Payment proof verification failed';
-    request.reviewedBy = req.user._id;
-    request.reviewedAt = new Date();
-    await request.save();
-
-    // Log the rejection action (history is saved in the request document)
-    res.json({
-      success: true,
-      data: {
-        message: `Coin request rejected for ${creator.name} (ID: ${creator._id})`,
-        creator: {
-          id: creator._id,
-          name: creator.name,
-          username: creator.username,
-        },
-        reviewedBy: {
-          id: req.user._id,
-          name: req.user.name,
-          username: req.user.username,
-        },
-        reviewedAt: request.reviewedAt,
-        rejectionReason: request.rejectionReason,
-      },
+      request.status = 'rejected';
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
+      request.rejectionReason = req.body.rejectionReason || 'Payment proof verification failed';
+      await request.save({ session });
+      return { message: 'Coin request rejected', creatorWallet: creator.creatorWallet, reviewedAt: request.reviewedAt };
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    res.json({ success: true, data });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 // @desc    Get withdrawal settings
@@ -1150,10 +869,7 @@ exports.getWithdrawalSettings = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -1164,7 +880,7 @@ exports.updateWithdrawalSettings = async (req, res) => {
   try {
     const { minimumWithdrawalAmount, withdrawalAmounts } = req.body;
 
-    if (minimumWithdrawalAmount !== undefined && minimumWithdrawalAmount < 0) {
+    if (minimumWithdrawalAmount !== undefined && (!Number.isSafeInteger(minimumWithdrawalAmount) || minimumWithdrawalAmount < 0)) {
       return res.status(400).json({
         success: false,
         error: 'Minimum withdrawal amount must be a positive number',
@@ -1178,7 +894,7 @@ exports.updateWithdrawalSettings = async (req, res) => {
           error: 'Withdrawal amounts must be a non-empty array',
         });
       }
-      if (!withdrawalAmounts.every((amount) => amount > 0)) {
+      if (!withdrawalAmounts.every((amount) => Number.isSafeInteger(amount) && amount > 0)) {
         return res.status(400).json({
           success: false,
           error: 'All withdrawal amounts must be positive numbers',
@@ -1189,7 +905,7 @@ exports.updateWithdrawalSettings = async (req, res) => {
     let settings = await WithdrawalSettings.findOne();
     if (!settings) {
       settings = new WithdrawalSettings({
-        minimumWithdrawalAmount: minimumWithdrawalAmount || 1000,
+        minimumWithdrawalAmount: minimumWithdrawalAmount ?? 1000,
         withdrawalAmounts: withdrawalAmounts || [100, 500, 1000, 2000, 5000, 10000],
         updatedBy: req.user._id,
       });
@@ -1216,9 +932,6 @@ exports.updateWithdrawalSettings = async (req, res) => {
       message: 'Withdrawal settings updated successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };

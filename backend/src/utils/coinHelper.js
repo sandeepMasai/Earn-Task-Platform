@@ -18,23 +18,24 @@ async function getCoinValue(key) {
     return coinCache[key];
   }
 
+  if (now - cacheTimestamp >= CACHE_DURATION) coinCache = {};
   try {
     // Fetch from database
     const config = await CoinConfig.findOne({ key });
     
     if (config) {
       coinCache[key] = config.value;
-      cacheTimestamp = now;
+      if (!cacheTimestamp || now - cacheTimestamp >= CACHE_DURATION) cacheTimestamp = now;
       return config.value;
     }
 
     // If not found in database, use default from constants
     const defaultValue = COIN_VALUES[key] || 0;
     coinCache[key] = defaultValue;
-    cacheTimestamp = now;
+    if (!cacheTimestamp || now - cacheTimestamp >= CACHE_DURATION) cacheTimestamp = now;
     return defaultValue;
   } catch (error) {
-    console.error(`Error fetching coin value for ${key}:`, error);
+    console.error(`Error fetching coin value for ${key}:`, { code: error.code || error.name });
     // Fallback to default
     return COIN_VALUES[key] || 0;
   }
@@ -48,7 +49,7 @@ async function getAllCoinValues() {
   const now = Date.now();
   
   // Check if cache is still valid
-  if (Object.keys(coinCache).length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
+  if (Object.keys(COIN_VALUES).every(key => coinCache[key] !== undefined) && (now - cacheTimestamp) < CACHE_DURATION) {
     return coinCache;
   }
 
@@ -72,7 +73,7 @@ async function getAllCoinValues() {
     cacheTimestamp = now;
     return values;
   } catch (error) {
-    console.error('Error fetching all coin values:', error);
+    console.error('Error fetching all coin values:', { code: error.code || error.name });
     // Return defaults on error
     return COIN_VALUES;
   }

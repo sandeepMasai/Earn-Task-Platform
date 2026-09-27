@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const Withdrawal = require('../models/Withdrawal');
@@ -18,10 +19,7 @@ exports.getBalance = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -47,10 +45,7 @@ exports.getTransactions = async (req, res) => {
       })),
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -59,74 +54,9 @@ exports.getTransactions = async (req, res) => {
 // @access  Private
 exports.requestWithdrawal = async (req, res) => {
   try {
-    const { amount, paymentMethod, accountDetails } = req.body;
-
-    if (!amount || !paymentMethod || !accountDetails) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide amount, payment method, and account details',
-      });
-    }
-
-    // Get dynamic minimum withdrawal amount
-    const settings = await WithdrawalSettings.getSettings();
-    const minWithdrawalAmount = settings.minimumWithdrawalAmount || MIN_WITHDRAWAL_AMOUNT;
-
-    if (amount < minWithdrawalAmount) {
-      return res.status(400).json({
-        success: false,
-        error: `Minimum withdrawal amount is ${minWithdrawalAmount} coins`,
-      });
-    }
-
-    const user = await User.findById(req.user._id);
-
-    if (user.coins < amount) {
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient balance',
-      });
-    }
-
-    // Deduct coins
-    user.coins -= amount;
-    user.totalWithdrawn += amount;
-    await user.save();
-
-    // Create withdrawal request
-    const withdrawal = await Withdrawal.create({
-      user: req.user._id,
-      amount,
-      paymentMethod,
-      accountDetails,
-      status: 'pending',
-    });
-
-    // Create transaction
-    await Transaction.create({
-      user: req.user._id,
-      type: 'withdrawn',
-      amount,
-      description: `Withdrawal request - ${paymentMethod}`,
-      withdrawal: withdrawal._id,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: {
-        id: withdrawal._id,
-        amount: withdrawal.amount,
-        status: withdrawal.status,
-        paymentMethod: withdrawal.paymentMethod,
-        requestedAt: withdrawal.createdAt,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+    const w = await require('../services/withdrawals').request(req.user._id, req.body);
+    res.status(201).json({ success: true, data: { id: w._id, amount: w.amount, status: w.status, paymentMethod: w.paymentMethod, requestedAt: w.createdAt } });
+  } catch (error) { return errorResponse(res, error); }
 };
 
 // @desc    Get withdrawal requests
@@ -152,10 +82,7 @@ exports.getWithdrawals = async (req, res) => {
       })),
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -173,10 +100,7 @@ exports.getWithdrawalSettings = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 

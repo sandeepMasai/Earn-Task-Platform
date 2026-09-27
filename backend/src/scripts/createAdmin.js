@@ -8,7 +8,9 @@ const createAdmin = async () => {
     console.log('✅ Connected to MongoDB');
 
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@earntask.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminPassword || adminPassword.length < 12) throw new Error('Set ADMIN_PASSWORD to at least 12 characters');
 
     // Check if admin exists
     let admin = await User.findOne({ email: adminEmail });
@@ -33,12 +35,12 @@ const createAdmin = async () => {
 
     console.log('📝 Admin credentials:');
     console.log('   Email:', adminEmail);
-    console.log('   Password:', adminPassword);
+
     console.log('   Role:', admin.role);
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error:', { code: error.code || error.name });
     process.exit(1);
   }
 };

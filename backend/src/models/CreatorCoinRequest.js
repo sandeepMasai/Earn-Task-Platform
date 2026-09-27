@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const creatorCoinRequestSchema = new mongoose.Schema(
   {
+    proofAsset: { type: require('./mediaAsset'), default: null },
     creator: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -58,17 +58,14 @@ const seedTasks = async () => {
       },
     ];
 
-    // Clear existing tasks
-    await Task.deleteMany({});
-    console.log('✅ Cleared existing tasks');
-
-    // Insert new tasks
-    await Task.insertMany(tasks);
+    for (const task of tasks) {
+      await Task.updateOne({ title: task.title, isCreatorTask: false }, { $setOnInsert: task }, { upsert: true });
+    }
     console.log('✅ Seeded tasks successfully with dynamic coin values');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error seeding tasks:', error);
+    console.error('❌ Error seeding tasks:', { code: error.code || error.name });
     process.exit(1);
   }
 };

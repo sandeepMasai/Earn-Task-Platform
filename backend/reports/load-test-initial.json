@@ -1,0 +1,306 @@
+{
+  "generatedAt": "2026-09-27T06:43:15.276Z",
+  "target": "disposable loopback app/database",
+  "criteria": {
+    "unexpectedErrorRate": 0,
+    "timeoutRate": 0,
+    "p95Ms": 15000,
+    "p99Ms": 45000,
+    "financialInvariantFailures": 0
+  },
+  "scenarios": [
+    {
+      "name": "health",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 994.58,
+      "p50Ms": 22.38,
+      "p95Ms": 28.5,
+      "p99Ms": 31.79,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 50
+      },
+      "cpuMs": 75.482,
+      "rssBytes": 121208832,
+      "heapDeltaBytes": -3457064,
+      "status": "PASS"
+    },
+    {
+      "name": "login (30/minute protection)",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 7.04,
+      "p50Ms": 7040.33,
+      "p95Ms": 7102.45,
+      "p99Ms": 7103.08,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 30,
+        "429": 20
+      },
+      "cpuMs": 7193.783,
+      "rssBytes": 149585920,
+      "heapDeltaBytes": 10517000,
+      "status": "PASS"
+    },
+    {
+      "name": "protected profile",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 909.95,
+      "p50Ms": 49.58,
+      "p95Ms": 52.81,
+      "p99Ms": 53.78,
+      "unexpectedErrorRate": 0.4,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 30,
+        "429": 20
+      },
+      "cpuMs": 89.915,
+      "rssBytes": 152338432,
+      "heapDeltaBytes": -3995024,
+      "status": "FAIL"
+    },
+    {
+      "name": "task listing",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 1042.74,
+      "p50Ms": 44.85,
+      "p95Ms": 46.46,
+      "p99Ms": 46.72,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 50
+      },
+      "cpuMs": 108.616,
+      "rssBytes": 155090944,
+      "heapDeltaBytes": 9026160,
+      "status": "PASS"
+    },
+    {
+      "name": "wallet reads",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 922.16,
+      "p50Ms": 48.08,
+      "p95Ms": 52.32,
+      "p99Ms": 52.43,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 50
+      },
+      "cpuMs": 137.571,
+      "rssBytes": 157319168,
+      "heapDeltaBytes": -4298696,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent withdrawals",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 529.21,
+      "p50Ms": 90.9,
+      "p95Ms": 92.9,
+      "p99Ms": 93.55,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "201": 1,
+        "400": 49
+      },
+      "cpuMs": 175.319,
+      "rssBytes": 161087488,
+      "heapDeltaBytes": 8069808,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent task completion",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 439.88,
+      "p50Ms": 111.32,
+      "p95Ms": 112.07,
+      "p99Ms": 112.28,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 49
+      },
+      "cpuMs": 273.516,
+      "rssBytes": 162152448,
+      "heapDeltaBytes": -4640832,
+      "status": "PASS"
+    },
+    {
+      "name": "proof submission",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 538.64,
+      "p50Ms": 88.06,
+      "p95Ms": 89.82,
+      "p99Ms": 91.37,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 40,
+        "409": 9
+      },
+      "cpuMs": 202.537,
+      "rssBytes": 165560320,
+      "heapDeltaBytes": -5502680,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent proof approval",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 483.59,
+      "p50Ms": 101.43,
+      "p95Ms": 102.07,
+      "p99Ms": 102.18,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 49
+      },
+      "cpuMs": 194.223,
+      "rssBytes": 167428096,
+      "heapDeltaBytes": 13892888,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent creator funding approval",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 722.21,
+      "p50Ms": 66.46,
+      "p95Ms": 67.18,
+      "p99Ms": 68.65,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 49
+      },
+      "cpuMs": 118.6,
+      "rssBytes": 174686208,
+      "heapDeltaBytes": 8340240,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent follows",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 643.05,
+      "p50Ms": 72.2,
+      "p95Ms": 75.04,
+      "p99Ms": 76.23,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 49
+      },
+      "cpuMs": 161.986,
+      "rssBytes": 182943744,
+      "heapDeltaBytes": 3130240,
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent like reward",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 677.59,
+      "p50Ms": 70.57,
+      "p95Ms": 72.36,
+      "p99Ms": 72.5,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "200": 1,
+        "400": 49
+      },
+      "cpuMs": 165.109,
+      "rssBytes": 190316544,
+      "heapDeltaBytes": 9781928,
+      "status": "PASS"
+    },
+    {
+      "name": "local uploads with rewards",
+      "concurrency": 50,
+      "requests": 50,
+      "requestsPerSecond": 114.55,
+      "p50Ms": 344.35,
+      "p95Ms": 430.38,
+      "p99Ms": 434.5,
+      "unexpectedErrorRate": 0,
+      "timeoutRate": 0,
+      "statuses": {
+        "201": 50
+      },
+      "cpuMs": 724.579,
+      "rssBytes": 215908352,
+      "heapDeltaBytes": 11881312,
+      "status": "PASS"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "withdrawal consistency at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "task ledger at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "unique proof at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "single proof reward at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "creator wallet at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "single follow at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "single like reward at 50",
+      "status": "PASS"
+    },
+    {
+      "name": "upload reward ledger at 50",
+      "status": "PASS"
+    }
+  ],
+  "driverErrors": {
+    "112": 1223,
+    "251": 1223
+  },
+  "limitations": [
+    "Short controlled bursts; not a soak test or production capacity guarantee",
+    "Login rate limiting stays enabled; expected HTTP 429 is recorded separately",
+    "Watch prerequisites are prepared with a test-controlled server clock; load requests cannot submit duration to earn rewards"
+  ],
+  "heapAfterGCBytes": 37438568,
+  "mongo": {
+    "transactionAborts": 1517,
+    "writeConflicts": 1305
+  },
+  "status": "FAIL"
+}

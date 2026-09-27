@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { validateId } = require('../middleware/validateRequest');
+router.param('id', validateId);
+router.param('userId', validateId);
 const {
   registerAsCreator,
   getCreatorDashboard,

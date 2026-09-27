@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const taskSubmissionSchema = new mongoose.Schema(
   {
+    proofAsset: { type: require('./mediaAsset'), default: null },
     task: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Task',

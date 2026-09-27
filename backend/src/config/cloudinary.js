@@ -1,5 +1,4 @@
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -15,52 +14,26 @@ const useCloudinary = () => {
     process.env.CLOUDINARY_API_SECRET);
 };
 
-// Verify Cloudinary configuration
-if (useCloudinary()) {
-  console.log('☁️  Cloudinary configured successfully');
-  console.log(`   Cloud Name: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-} else {
-  console.log('⚠️  Cloudinary not configured - using local storage');
-  console.log('   Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in .env');
-}
+const retry = require('../utils/retry');
 
-// Create storage for different file types
-const createStorage = (folder) => {
-  return new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-      let resourceType = 'auto'; // Cloudinary auto-detects type
-      let folderPath = folder || 'earn-task-platform';
+const uploadAsset = async (filePath, options) => {
+  try {
+    const result = await retry(() => cloudinary.uploader.upload(filePath, { timeout: 30000, overwrite: false, ...options }));
+    if (!result.public_id || !result.asset_id || !result.resource_type || !result.secure_url?.startsWith('https://')) throw new Error('Invalid upload response');
+    return result;
+  } catch (error) {
+    throw Object.assign(new Error('Media provider upload failed'), { status: error.http_code === 429 ? 503 : 502, providerStatus: Number.isInteger(error.http_code) ? error.http_code : undefined, providerCode: ['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED'].includes(error.code) ? error.code : undefined });
+  }
+};
 
-      // Determine resource type based on mimetype
-      if (file.mimetype.startsWith('image/')) {
-        resourceType = 'image';
-        folderPath = `${folderPath}/images`;
-      } else if (file.mimetype.startsWith('video/')) {
-        resourceType = 'video';
-        folderPath = `${folderPath}/videos`;
-      } else {
-        resourceType = 'raw'; // For documents
-        folderPath = `${folderPath}/documents`;
-      }
-
-      return {
-        folder: folderPath,
-        resource_type: resourceType,
-        allowed_formats: resourceType === 'image'
-          ? ['jpg', 'jpeg', 'png', 'gif', 'webp']
-          : resourceType === 'video'
-            ? ['mp4', 'mov', 'avi', 'webm', 'mkv']
-            : ['pdf', 'doc', 'docx', 'txt'],
-        transformation: resourceType === 'image'
-          ? [{ width: 1920, height: 1080, crop: 'limit', quality: 'auto' }]
-          : resourceType === 'video'
-            ? [{ quality: 'auto', fetch_format: 'auto' }]
-            : [],
-        public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}`,
-      };
-    },
-  });
+const deleteAsset = async (asset) => {
+  if (!asset?.publicId || !['image', 'video', 'raw'].includes(asset.resourceType)) throw new Error('Invalid stored asset identity');
+  try {
+    const result = await retry(() => cloudinary.uploader.destroy(asset.publicId, { resource_type: asset.resourceType, invalidate: true, timeout: 30000 }));
+    return ['ok', 'not found'].includes(result.result);
+  } catch (error) {
+    throw Object.assign(new Error('Media provider deletion failed'), { status: error.http_code === 429 ? 503 : 502, providerStatus: Number.isInteger(error.http_code) ? error.http_code : undefined, providerCode: ['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED'].includes(error.code) ? error.code : undefined });
+  }
 };
 
 // Helper function to delete file from Cloudinary
@@ -70,58 +43,31 @@ const deleteFromCloudinary = async (url) => {
   }
 
   try {
-    // Check if it's a Cloudinary URL
-    if (!url.includes('cloudinary.com')) {
-      return false; // Not a Cloudinary URL
-    }
-
-    // Extract public_id from Cloudinary URL
-    // Cloudinary URLs format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/{transformations}/{folder}/{public_id}.{format}
-    const urlParts = url.split('/');
-    const uploadIndex = urlParts.findIndex(part => part === 'upload');
-
-    if (uploadIndex === -1) {
-      return false; // Not a valid Cloudinary URL
-    }
-
-    // Get everything after 'upload' and before file extension
-    const afterUpload = urlParts.slice(uploadIndex + 1);
-    const lastPart = afterUpload[afterUpload.length - 1];
-    const publicIdWithExt = lastPart.split('.')[0];
-
-    // Reconstruct public_id with folder path if present
-    let publicId = '';
-    if (afterUpload.length > 1) {
-      // Include folder path in public_id
-      const folderParts = afterUpload.slice(0, -1);
-      publicId = folderParts.join('/') + '/' + publicIdWithExt;
-    } else {
-      publicId = publicIdWithExt;
-    }
-
-    // Determine resource type from URL path
-    let resourceType = 'image';
-    if (url.includes('/video/')) {
-      resourceType = 'video';
-    } else if (url.includes('/raw/')) {
-      resourceType = 'raw';
-    }
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'res.cloudinary.com') return false;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts[0] !== process.env.CLOUDINARY_CLOUD_NAME || parts[2] !== 'upload') return false;
+    const resourceType = parts[1];
+    if (!['image', 'video', 'raw'].includes(resourceType)) return false;
+    const asset = parts.slice(3);
+    const version = asset.findIndex(part => /^v\d+$/.test(part));
+    const publicParts = version >= 0 ? asset.slice(version + 1) : asset;
+    let publicId = decodeURIComponent(publicParts.join('/'));
+    if (resourceType !== 'raw') publicId = publicId.replace(/\.[^/.]+$/, '');
+    if (!publicId) return false;
 
     // Delete from Cloudinary
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: resourceType,
-    });
-
-    return result.result === 'ok';
+    return deleteAsset({ publicId, resourceType });
   } catch (error) {
-    console.error('Error deleting from Cloudinary:', error);
+    console.error('Media provider deletion failed');
     return false;
   }
 };
 
 module.exports = {
   cloudinary,
-  createStorage,
+  uploadAsset,
+  deleteAsset,
   deleteFromCloudinary,
   useCloudinary,
 };

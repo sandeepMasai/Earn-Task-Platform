@@ -4,6 +4,7 @@ const generateReferralCode = require('../utils/generateReferralCode');
 
 const userSchema = new mongoose.Schema(
   {
+    avatarAsset: { type: require('./mediaAsset'), default: null },
     email: {
       type: String,
       required: [true, 'Email is required'],

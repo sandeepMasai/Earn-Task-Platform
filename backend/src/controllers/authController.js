@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const generateToken = require('../utils/generateToken');
@@ -35,57 +36,21 @@ exports.signup = async (req, res) => {
       }
     }
 
-    // Create user
-    const user = await User.create({
-      email,
-      password,
-      name,
-      username,
-      referredBy,
-    });
-
-    // Give referral bonus to referrer
-    if (referredBy) {
-      try {
-        const referrer = await User.findById(referredBy);
-        if (referrer) {
-          // Get dynamic coin value for referral bonus
-          const bonusAmount = await getCoinValue('REFERRAL_BONUS');
-          const oldCoins = referrer.coins;
-
-          referrer.coins += bonusAmount;
-          referrer.totalEarned += bonusAmount;
-          await referrer.save();
-
-          console.log(`💰 Referral bonus added: ${oldCoins} → ${referrer.coins} coins for user ${referrer.username}`);
-
-          // Create transaction for referrer
-          await Transaction.create({
-            user: referredBy,
-            type: 'referral',
-            amount: bonusAmount,
-            description: `Referral bonus for referring ${user.username}`,
-          });
-
-          console.log('✅ Transaction created for referral bonus');
-        } else {
-          console.log('❌ Referrer not found with ID:', referredBy);
-        }
-      } catch (error) {
-        console.error('❌ Error giving referral bonus:', error);
-        // Don't fail the signup if referral bonus fails
+    const bonusAmount = referredBy ? await getCoinValue('REFERRAL_BONUS') : 0;
+    const user = await require('mongoose').connection.transaction(async session => {
+      const [created] = await User.create([{ email, password, name, username, referredBy }], { session });
+      if (referredBy) {
+        const referrer = await User.findByIdAndUpdate(referredBy, { $inc: { coins: bonusAmount, totalEarned: bonusAmount } }, { session });
+        if (!referrer) throw require('../utils/httpError')(400, 'Referrer no longer exists');
+        await Transaction.create([{ user: referredBy, type: 'referral', amount: bonusAmount, description: `Referral bonus for referring ${created.username}` }], { session });
       }
-    }
+      return created;
+    });
 
-    const accessToken = generateToken(user._id, {
-      expiresIn: process.env.JWT_EXPIRE || '1h',
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-    });
-    const refreshToken = generateToken(user._id, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
-      secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key',
-    });
-    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
+    if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateToken(user._id, { type: 'refresh' });
+    const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.status(201).json({
       success: true,
@@ -110,10 +75,7 @@ exports.signup = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -140,15 +102,10 @@ exports.login = async (req, res) => {
       });
     }
 
-    const accessToken = generateToken(user._id, {
-      expiresIn: process.env.JWT_EXPIRE || '1h',
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-    });
-    const refreshToken = generateToken(user._id, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
-      secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key',
-    });
-    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
+    if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateToken(user._id, { type: 'refresh' });
+    const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.json({
       success: true,
@@ -174,10 +131,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -211,10 +165,7 @@ exports.getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -255,10 +206,7 @@ exports.getUserById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -294,10 +242,7 @@ exports.updateInstagramId = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -350,6 +295,7 @@ exports.updateProfile = async (req, res) => {
       const avatarUrl = getFileUrl(req.file);
       if (avatarUrl) {
         user.avatar = avatarUrl;
+        user.avatarAsset = req.file.asset || null;
       }
     } else if (avatar !== undefined) {
       user.avatar = avatar;
@@ -379,10 +325,7 @@ exports.updateProfile = async (req, res) => {
       message: 'Profile updated successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -393,7 +336,7 @@ exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
 
-    if (!oldPassword || !newPassword) {
+    if (typeof oldPassword !== 'string' || typeof newPassword !== 'string' || !oldPassword || !newPassword) {
       return res.status(400).json({
         success: false,
         error: 'Old password and new password are required',
@@ -434,10 +377,7 @@ exports.changePassword = async (req, res) => {
       message: 'Password changed successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -463,19 +403,19 @@ exports.refreshToken = async (req, res) => {
 
     const decoded = jwt.verify(
       refreshToken,
-      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'your-secret-key'
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      { algorithms: ['HS256'] }
     );
 
+    if (decoded.type !== 'refresh') return res.status(401).json({ success: false, error: 'Invalid refresh token' });
     const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const accessToken = generateToken(user._id, {
-      expiresIn: process.env.JWT_EXPIRE || '1h',
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-    });
-    const expiresAt = new Date(Date.now() + (process.env.JWT_EXPIRE_MS ? parseInt(process.env.JWT_EXPIRE_MS) : 3600000));
+    if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
+    const accessToken = generateToken(user._id);
+    const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.json({
       success: true,

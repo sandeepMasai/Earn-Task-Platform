@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const postSchema = new mongoose.Schema(
   {
+    mediaAsset: { type: require('./mediaAsset'), default: null },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -41,6 +42,7 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    rewardedLikes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     likes: [
       {
         user: {

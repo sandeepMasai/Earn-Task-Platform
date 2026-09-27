@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema(
   {
+    reconciliationId: { type: String },
+    direction: { type: String, enum: ['credit', 'debit'] },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -10,7 +12,7 @@ const transactionSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['earned', 'withdrawn', 'bonus', 'referral'],
+      enum: ['earned', 'withdrawn', 'bonus', 'referral', 'refund', 'reconciliation'],
     },
     amount: {
       type: Number,
@@ -36,6 +38,8 @@ const transactionSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+transactionSchema.index({ reconciliationId: 1 }, { unique: true, partialFilterExpression: { reconciliationId: { $type: 'string' } } });
 
 // Index for faster queries
 transactionSchema.index({ user: 1, createdAt: -1 });

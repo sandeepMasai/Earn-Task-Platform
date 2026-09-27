@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const Task = require('../models/Task');
 const User = require('../models/User');
 
@@ -47,6 +48,8 @@ exports.createTask = async (req, res) => {
       });
     }
 
+    if (!Number.isSafeInteger(Number(coins)) || Number(coins) < 0 || (type === 'watch_video' && (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) <= 0))) return res.status(400).json({ success: false, error: 'Invalid coins or video duration' });
+
     // Create task
     const taskData = {
       type,
@@ -85,10 +88,7 @@ exports.createTask = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -129,10 +129,7 @@ exports.getAllTasks = async (req, res) => {
       data: tasksWithStats,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -190,10 +187,7 @@ exports.getTaskById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -213,6 +207,9 @@ exports.updateTask = async (req, res) => {
 
     const { type, title, description, coins, videoUrl, videoDuration, instagramUrl, youtubeUrl, thumbnail, isActive } = req.body;
 
+    if (task.isCreatorTask) return res.status(400).json({ success: false, error: 'Edit funded tasks through the creator API' });
+    if (coins !== undefined && (!Number.isSafeInteger(Number(coins)) || Number(coins) < 0)) return res.status(400).json({ success: false, error: 'Invalid coins' });
+
     // Update fields
     if (type) task.type = type;
     if (title) task.title = title;
@@ -225,6 +222,7 @@ exports.updateTask = async (req, res) => {
     if (thumbnail !== undefined) task.thumbnail = thumbnail;
     if (isActive !== undefined) task.isActive = isActive;
 
+    if (task.type === 'watch_video' && (!task.videoUrl || !Number.isFinite(task.videoDuration) || task.videoDuration <= 0)) return res.status(400).json({ success: false, error: 'Video URL and positive duration required' });
     await task.save();
 
     const completionCount = task.completedBy.length;
@@ -251,10 +249,7 @@ exports.updateTask = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -272,6 +267,8 @@ exports.deleteTask = async (req, res) => {
       });
     }
 
+    if (task.isCreatorTask) return res.status(400).json({ success: false, error: 'Delete funded tasks through the creator API to refund the budget' });
+    await require('../models/TaskSubmission').deleteMany({ task: task._id });
     // Hard delete
     await Task.findByIdAndDelete(req.params.id);
 
@@ -280,10 +277,7 @@ exports.deleteTask = async (req, res) => {
       message: 'Task deleted successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -304,10 +298,10 @@ exports.getTaskCompletions = async (req, res) => {
     const completions = task.completedBy.map((completion) => {
       const user = completion.user;
       return {
-        userId: user._id.toString(),
-        userName: user.name,
-        userUsername: user.username,
-        userEmail: user.email,
+        userId: user?._id.toString() || null,
+        userName: user?.name || 'Deleted user',
+        userUsername: user?.username || null,
+        userEmail: user?.email || null,
         completedAt: completion.completedAt,
         coinsEarned: task.coins,
       };
@@ -324,10 +318,7 @@ exports.getTaskCompletions = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 

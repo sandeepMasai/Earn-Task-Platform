@@ -6,3 +6,12 @@ uploads/
 dist/
 coverage/
 
+
+# Local configuration copies may contain secrets
+*.env
+.env.*
+!.env.example
+
+# Financial reports and reviewed account evidence are private
+wallet-report-*.json
+reconciliation-evidence*.json

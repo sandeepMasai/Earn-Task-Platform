@@ -34,14 +34,16 @@ cp .env.example .env
 3. Update `.env` with your configuration:
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/earn-task-platform
+MONGODB_URI=mongodb://127.0.0.1:27017/earn-task-platform?replicaSet=rs0
 JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRE=7d
+JWT_EXPIRE=1h
 ```
 
-4. Start MongoDB (if running locally):
+4. Use MongoDB Atlas or a local replica set. Wallet and reward operations require transactions. For a new local MongoDB instance:
 ```bash
-mongod
+mongod --replSet rs0 --bind_ip 127.0.0.1
+# In another terminal, initialize once:
+mongosh --eval "rs.initiate()"
 ```
 
 5. Start the server:
@@ -161,3 +163,36 @@ export const API_BASE_URL = 'http://localhost:3000/api';
 
 For production, update to your deployed backend URL.
 
+
+## Verification and rollout
+
+Use Node.js 20+ and install MongoDB (`mongod`) on the test machine, then run:
+
+```bash
+npm test
+```
+
+Tests launch a temporary replica set on a random loopback port, create their own
+accounts and upload directory, exercise all 80 declared API endpoints, and remove
+the temporary database afterward. They never load `backend/.env`, connect to the
+configured database, or upload to Cloudinary. Set `MONGOD_BINARY` if `mongod` is
+not on PATH. See [API_AUDIT.md](./API_AUDIT.md) for results and limitations.
+
+Restart the backend after updating. Existing sessions must sign in again because
+access and refresh tokens now carry distinct token types. Configure `JWT_SECRET`;
+there is no built-in secret fallback. `JWT_REFRESH_SECRET` is optional but should
+be a separate random secret. Expiry timestamps follow the actual JWT expiry.
+
+The server starts only after MongoDB connects and confirms transaction support.
+`GET /api/health` returns 503 when its database connection is unavailable.
+`CORS_ORIGINS` accepts comma-separated browser origins; native Android clients do
+not require CORS. Do not include a trailing slash in a browser origin.
+
+`npm run seed` adds missing sample tasks without deleting existing tasks.
+`npm run create-admin` requires `ADMIN_PASSWORD` (at least 12 characters).
+Only `.env` is loaded by the backend; a file named `Earn-Task-Platform.env` is not
+loaded automatically. Keep backend credentials out of the mobile app environment.
+
+## Production readiness
+
+See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for verified results, current deployment blockers, configuration, tests, reconciliation safeguards and rollback steps.

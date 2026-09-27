@@ -17,7 +17,8 @@ const protect = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+      if (decoded.type !== 'access') return res.status(401).json({ success: false, error: 'Access token required' });
       req.user = await User.findById(decoded.userId).select('-password');
       
       if (!req.user) {
@@ -27,6 +28,7 @@ const protect = async (req, res, next) => {
         });
       }
 
+      if (!req.user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
       next();
     } catch (error) {
       return res.status(401).json({

@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { COIN_VALUES } = require('../constants');
@@ -35,10 +36,7 @@ exports.getReferralStats = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -69,10 +67,7 @@ exports.checkReferralCode = async (req, res) => {
       });
     }
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 

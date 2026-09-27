@@ -1,3 +1,4 @@
+const errorResponse = require('../utils/errorResponse');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
@@ -25,7 +26,7 @@ exports.getFeed = async (req, res) => {
     const totalPosts = await Post.countDocuments({ isActive: true });
     // Drop posts whose user record no longer exists to avoid null derefs
     const filteredPosts = posts.filter((post) => post.user);
-    const hasMore = skip + filteredPosts.length < totalPosts;
+    const hasMore = skip + posts.length < totalPosts;
 
     res.json({
       success: true,
@@ -71,10 +72,7 @@ exports.getFeed = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -123,10 +121,7 @@ exports.getMyPosts = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -157,6 +152,9 @@ exports.uploadPost = async (req, res) => {
     const postType = type || (file.mimetype.startsWith('image/') ? 'image' :
       file.mimetype.startsWith('video/') ? 'video' : 'document');
 
+    if (!['image', 'video', 'document'].includes(postType)) return res.status(400).json({ success: false, error: 'Invalid post type' });
+    if (postType === 'video' && (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) < 10 || Number(videoDuration) > 120)) return res.status(400).json({ success: false, error: 'Video duration must be between 10 and 120 seconds' });
+
     // Validate video duration (10 seconds minimum, 2 minutes maximum = 120 seconds)
     if (postType === 'video' && videoDuration) {
       const duration = parseFloat(videoDuration);
@@ -178,6 +176,7 @@ exports.uploadPost = async (req, res) => {
 
     const postData = {
       user: req.user._id,
+      mediaAsset: file.asset || null,
       type: postType,
       caption: caption || '',
     };
@@ -199,25 +198,14 @@ exports.uploadPost = async (req, res) => {
       }
     }
 
-    const post = await Post.create(postData);
-    await post.populate('user', 'name username avatar');
-
-    // Get dynamic coin value for post upload
     const postUploadCoins = await getCoinValue('POST_UPLOAD');
-
-    // Add coins to user
-    const user = await User.findById(req.user._id);
-    user.coins += postUploadCoins;
-    user.totalEarned += postUploadCoins;
-    await user.save();
-
-    // Create transaction
-    await Transaction.create({
-      user: req.user._id,
-      type: 'earned',
-      amount: postUploadCoins,
-      description: 'Post upload reward',
+    const post = await require('mongoose').connection.transaction(async session => {
+      const [created] = await Post.create([postData], { session });
+      await User.updateOne({ _id: req.user._id }, { $inc: { coins: postUploadCoins, totalEarned: postUploadCoins } }, { session });
+      await Transaction.create([{ user: req.user._id, type: 'earned', amount: postUploadCoins, description: 'Post upload reward' }], { session });
+      return created;
     });
+    await post.populate('user', 'name username avatar');
 
     res.status(201).json({
       success: true,
@@ -241,10 +229,7 @@ exports.uploadPost = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -255,55 +240,34 @@ exports.likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
       });
     }
 
-    const alreadyLiked = post.isLikedByUser(req.user._id);
-
-    if (alreadyLiked) {
-      return res.status(400).json({
-        success: false,
-        error: 'Post already liked',
-      });
-    }
-
-    post.likes.push({
-      user: req.user._id,
-      likedAt: new Date(),
+    await require('mongoose').connection.transaction(async session => {
+      const current = await Post.findById(req.params.id).session(session);
+      if (!current || !current.isActive) throw require('../utils/httpError')(404, 'Post not found');
+      if (current.isLikedByUser(req.user._id)) throw require('../utils/httpError')(400, 'Post already liked');
+      current.likes.push({ user: req.user._id });
+      const previouslyRewarded = current.rewardedLikes.some(id => id.equals(req.user._id));
+      const amount = await getCoinValue('POST_LIKE');
+      if (!previouslyRewarded && amount > 0) {
+        current.rewardedLikes.push(req.user._id);
+        await User.updateOne({ _id: req.user._id }, { $inc: { coins: amount, totalEarned: amount } }, { session });
+        await Transaction.create([{ user: req.user._id, type: 'earned', amount, description: 'Post like reward' }], { session });
+      }
+      await current.save({ session });
     });
-
-    await post.save();
-
-    // Award coins to user who liked the post (if enabled)
-    const postLikeCoins = await getCoinValue('POST_LIKE');
-    if (postLikeCoins > 0) {
-      const user = await User.findById(req.user._id);
-      user.coins += postLikeCoins;
-      user.totalEarned += postLikeCoins;
-      await user.save();
-
-      // Create transaction
-      await Transaction.create({
-        user: req.user._id,
-        type: 'earned',
-        amount: postLikeCoins,
-        description: 'Post like reward',
-      });
-    }
 
     res.json({
       success: true,
       message: 'Post liked',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -314,28 +278,21 @@ exports.unlikePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
       });
     }
 
-    post.likes = post.likes.filter(
-      (like) => like.user.toString() !== req.user._id.toString()
-    );
-
-    await post.save();
+    await Post.updateOne({ _id: post._id }, { $pull: { likes: { user: req.user._id } } });
 
     res.json({
       success: true,
       message: 'Post unliked',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -346,7 +303,7 @@ exports.getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate('user', 'name username avatar');
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
@@ -375,10 +332,7 @@ exports.getPostById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -390,14 +344,14 @@ exports.addComment = async (req, res) => {
     const { text } = req.body;
     const post = await Post.findById(req.params.id);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
       });
     }
 
-    if (!text || text.trim().length === 0) {
+    if (typeof text !== 'string' || text.trim().length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Comment text is required',
@@ -429,10 +383,7 @@ exports.addComment = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -443,7 +394,7 @@ exports.getComments = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate('comments.user', 'name username avatar');
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
@@ -464,10 +415,7 @@ exports.getComments = async (req, res) => {
       })),
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -481,7 +429,7 @@ exports.updatePost = async (req, res) => {
 
     const post = await Post.findById(id);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
@@ -496,7 +444,10 @@ exports.updatePost = async (req, res) => {
       });
     }
 
-    post.caption = caption || post.caption;
+    if (caption !== undefined) {
+      if (typeof caption !== 'string') return res.status(400).json({ success: false, error: 'Caption must be text' });
+      post.caption = caption;
+    }
     await post.save();
 
     res.json({
@@ -513,10 +464,7 @@ exports.updatePost = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 
@@ -529,7 +477,7 @@ exports.deletePost = async (req, res) => {
 
     const post = await Post.findById(id);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({
         success: false,
         error: 'Post not found',
@@ -552,25 +500,26 @@ exports.deletePost = async (req, res) => {
       post.thumbnailUrl,
     ].filter(Boolean);
 
-    for (const fileUrl of filesToDelete) {
+    if (post.mediaAsset) await require('../config/cloudinary').deleteAsset(post.mediaAsset);
+    for (const fileUrl of post.mediaAsset ? [] : filesToDelete) {
       if (!fileUrl) continue;
 
-      if (useCloudinary && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
+      if (useCloudinary() && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
         // Delete from Cloudinary
         try {
           await deleteFromCloudinary(fileUrl);
         } catch (error) {
-          console.error('Error deleting from Cloudinary:', error);
+          console.error('Error deleting from Cloudinary:');
         }
       } else if (fileUrl.startsWith('/uploads/')) {
         // Delete from local storage
-        const fileFullPath = path.join(__dirname, '../../', fileUrl);
+        const fileFullPath = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads'), path.basename(fileUrl));
         try {
           if (fs.existsSync(fileFullPath)) {
             fs.unlinkSync(fileFullPath);
           }
         } catch (fileError) {
-          console.error('Error deleting local file:', fileError);
+          console.error('Error deleting local file:');
         }
       }
     }
@@ -582,10 +531,7 @@ exports.deletePost = async (req, res) => {
       message: 'Post deleted successfully',
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return errorResponse(res, error);
   }
 };
 

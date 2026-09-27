@@ -5,13 +5,9 @@ const dotenv = require('dotenv');
 const path = require('path');
 
 // Load environment variables
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') dotenv.config({ path: path.join(__dirname, '../.env') });
 
-// Log file size limits on startup
-console.log('\n📋 File Upload Configuration:');
-console.log(`   MAX_FILE_SIZE: ${process.env.MAX_FILE_SIZE || 'not set (default: 900MB)'}`);
-console.log(`   MAX_VIDEO_SIZE: ${process.env.MAX_VIDEO_SIZE || 'not set (default: 900MB)'}`);
-console.log('');
+require('./config/production').validateProduction();
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -26,10 +22,25 @@ const storyRoutes = require('./routes/storyRoutes');
 const followRoutes = require('./routes/followRoutes');
 
 const app = express();
+app.disable('x-powered-by');
+// Render terminates TLS at one trusted reverse proxy. Never trust arbitrary hops.
+app.set('trust proxy', process.env.RENDER === 'true' ? 1 : false);
+app.use(require('./middleware/security').helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.locals.shuttingDown = false;
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+const readiness = async (req, res) => {
+  try {
+    if (app.locals.shuttingDown || mongoose.connection.readyState !== 1) throw new Error('Not ready');
+    await mongoose.connection.db.command({ ping: 1 }, { maxTimeMS: 2000 });
+    res.json({ status: 'ready' });
+  } catch { res.status(503).json({ status: 'not_ready' }); }
+};
+app.get('/ready', readiness);
+
 
 // Middleware
 app.use(cors({
-  origin: '*', // Allow all origins (for React Native)
+  origin: (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean), // Native apps do not require browser CORS
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -37,25 +48,24 @@ app.use(cors({
 }));
 
 // Handle preflight requests
-app.options('*', cors());
 
-app.use(express.json({ limit: '1000mb' })); // Increased for large file uploads
-app.use(express.urlencoded({ extended: true, limit: '1000mb' })); // Increased for large file uploads
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 // Log all requests
 app.use((req, res, next) => {
-  console.log(`📥 ${req.method} ${req.path}`, req.body || req.query || '');
+  if (process.env.NODE_ENV !== 'test') console.log(`${req.method} ${req.path}`);
   next();
 });
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(process.env.UPLOAD_DIR || path.join(__dirname, '../uploads')));
 
-// Database connection
-mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/earn-task-platform')
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('❌ MongoDB connection error:', err));
+app.use('/api', require('./middleware/validateRequest').validateQuery);
+const { rateLimit } = require('./middleware/security');
+app.use(['/api/auth/login', '/api/auth/signup', '/api/auth/refresh'], rateLimit({ prefix: 'auth', limit: 30, windowMs: 60000 }));
+app.use('/api', rateLimit({ prefix: 'api', limit: 600, windowMs: 60000 }));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -71,65 +81,16 @@ app.use('/api/follow', followRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Earn Task Platform API is running' });
+  const connected = mongoose.connection.readyState === 1;
+  res.status(connected ? 200 : 503).json({ status: connected ? 'ok' : 'unavailable', database: connected ? 'connected' : 'disconnected' });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-
-  // Handle Multer errors specifically
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    // Check if it's a video upload (from field name or content type)
-    const isVideo = err.field === 'video' || err.field === 'media' ||
-      (req.file && req.file.mimetype && req.file.mimetype.startsWith('video/'));
-
-    const maxSizeMB = isVideo
-      ? (process.env.MAX_VIDEO_SIZE
-        ? Math.round(parseInt(process.env.MAX_VIDEO_SIZE) / (1024 * 1024))
-        : 900)
-      : (process.env.MAX_FILE_SIZE
-        ? Math.round(parseInt(process.env.MAX_FILE_SIZE) / (1024 * 1024))
-        : 900);
-
-    const fileType = isVideo ? 'video' : 'file';
-    return res.status(413).json({
-      success: false,
-      error: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} too large. Maximum ${fileType} size is ${maxSizeMB}MB`,
-    });
-  }
-
-  // Handle other Multer errors
-  if (err.name === 'MulterError') {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      // Check if it's a video upload
-      const isVideo = err.field === 'video' || err.field === 'media' ||
-        (req.file && req.file.mimetype && req.file.mimetype.startsWith('video/'));
-
-      const maxSizeMB = isVideo
-        ? (process.env.MAX_VIDEO_SIZE
-          ? Math.round(parseInt(process.env.MAX_VIDEO_SIZE) / (1024 * 1024))
-          : 900)
-        : (process.env.MAX_FILE_SIZE
-          ? Math.round(parseInt(process.env.MAX_FILE_SIZE) / (1024 * 1024))
-          : 900);
-
-      const fileType = isVideo ? 'video' : 'file';
-      return res.status(413).json({
-        success: false,
-        error: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} too large. Maximum ${fileType} size is ${maxSizeMB}MB`,
-      });
-    }
-    return res.status(400).json({
-      success: false,
-      error: `Upload error: ${err.message}`,
-    });
-  }
-
-  res.status(err.status || 500).json({
-    success: false,
-    error: err.message || 'Internal server error',
-  });
+  if (res.headersSent) return next(err);
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ success: false, error: 'File exceeds the configured upload size limit' });
+  if (err.name === 'MulterError') return res.status(400).json({ success: false, error: err.message });
+  return require('./utils/errorResponse')(res, err);
 });
 
 // 404 handler
@@ -140,28 +101,23 @@ app.use((req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces
-
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on ${HOST}:${PORT}`);
-  console.log(`📱 API: http://localhost:${PORT}/api`);
-  console.log(`📱 API (Network): http://${getLocalIP()}:${PORT}/api`);
-});
-
-// Get local IP address for network access
-function getLocalIP() {
-  const os = require('os');
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return 'localhost';
-}
-
 module.exports = app;
 
+if (require.main === module) {
+  const connectDB = require('./config/database');
+  const PORT = process.env.PORT || 3000;
+  const HOST = process.env.HOST || '0.0.0.0';
+  connectDB().then(async () => {
+    // Finish declared indexes before accepting traffic; never drop existing indexes.
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
+    const server = app.listen(PORT, HOST, () => console.log(`Server running on port ${PORT}`));
+    server.requestTimeout = 120000;
+    server.headersTimeout = 15000;
+    server.on('shutdown', () => { app.locals.shuttingDown = true; });
+    require('./utils/lifecycle').installShutdown(server);
+  }).catch((error) => {
+    console.error('Backend startup failed', { code: error.code || error.name });
+    mongoose.disconnect().catch(() => {});
+    process.exitCode = 1;
+  });
+}

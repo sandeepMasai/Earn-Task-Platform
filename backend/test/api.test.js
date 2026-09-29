@@ -21,7 +21,7 @@ const Withdrawal = require('../src/models/Withdrawal');
 const Transaction = require('../src/models/Transaction');
 const TaskSubmission = require('../src/models/TaskSubmission');
 const CoinConfig = require('../src/models/CoinConfig');
-let mongo, server, base, user, admin, creator, other;
+let mongo, server, base, user, admin, creator, other, isolatedMongoUri;
 const coverage = new Set();
 const outcomes = [];
 async function request(method, route, token, body) {
@@ -49,7 +49,7 @@ function upload(field, values = {}) {
 }
 before(async () => {
   const instance = await require('./support/mongo').startMongo(directory);
-  mongo = instance.child;
+  mongo = instance.child; isolatedMongoUri = instance.uri;
   await mongoose.connect(instance.uri, { serverSelectionTimeoutMS: 15000 });
   const app = require('../src/server');
   for (const model of Object.values(mongoose.models)) await model.init();
@@ -328,6 +328,24 @@ test('reviewed reconciliation repairs once, rejects stale reports, and rolls bac
     await User.updateOne({ _id: account.id }, { $inc: { coins: 1 } });
     await assert.rejects(service.apply(next, true), /stale/);
   } finally { delete process.env.RECONCILE_APPLY; }
+});
+
+test('health/readiness exact responses, disconnected MongoDB and secret-free ping failure', async () => {
+  assert.deepEqual(await request('GET', '/health'), { status: 200, body: { status: 'ok' } });
+  assert.deepEqual(await request('GET', '/ready'), { status: 200, body: { status: 'ready', database: 'connected' } });
+  const db = mongoose.connection.db, command = db.command;
+  const logs = [], originalError = console.error;
+  console.error = (...args) => logs.push(args);
+  db.command = async () => { throw new Error('mongodb://synthetic-user:synthetic-password@synthetic-host/private-db'); };
+  try {
+    assert.deepEqual(await request('GET', '/ready'), { status: 503, body: { status: 'not_ready', database: 'disconnected' } });
+    assert.equal(JSON.stringify(logs).includes('synthetic-'), false);
+  } finally { db.command = command; console.error = originalError; }
+  try {
+    await mongoose.disconnect();
+    assert.deepEqual(await request('GET', '/ready'), { status: 503, body: { status: 'not_ready', database: 'disconnected' } });
+    assert.deepEqual(await request('GET', '/health'), { status: 200, body: { status: 'ok' } });
+  } finally { await mongoose.connect(isolatedMongoUri, { serverSelectionTimeoutMS: 15000 }); }
 });
 
 test('production health, security headers, real throttling and readiness', async () => {

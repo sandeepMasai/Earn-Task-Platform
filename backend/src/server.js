@@ -7,7 +7,13 @@ const path = require('path');
 // Load environment variables
 if (process.env.NODE_ENV !== 'test') dotenv.config({ path: path.join(__dirname, '../.env') });
 
-require('./config/production').validateProduction();
+try {
+  require('./config/production').validateProduction();
+} catch (error) {
+  if (require.main !== module) throw error;
+  console.error('Backend startup failed: configuration error');
+  process.exit(1);
+}
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -32,8 +38,8 @@ const readiness = async (req, res) => {
   try {
     if (app.locals.shuttingDown || mongoose.connection.readyState !== 1) throw new Error('Not ready');
     await mongoose.connection.db.command({ ping: 1 }, { maxTimeMS: 2000 });
-    res.json({ status: 'ready' });
-  } catch { res.status(503).json({ status: 'not_ready' }); }
+    res.json({ status: 'ready', database: 'connected' });
+  } catch { res.status(503).json({ status: 'not_ready', database: 'disconnected' }); }
 };
 app.get('/ready', readiness);
 
@@ -108,16 +114,20 @@ if (require.main === module) {
   const connectDB = require('./config/database');
   const PORT = process.env.PORT || 3000;
   const HOST = process.env.HOST || '0.0.0.0';
+  let startupCategory = 'database connection error';
   connectDB().then(async () => {
+    startupCategory = 'index initialization error';
     // Finish declared indexes before accepting traffic; never drop existing indexes.
     await Promise.all(Object.values(mongoose.models).map(model => model.init()));
-    const server = app.listen(PORT, HOST, () => console.log(`Server running on port ${PORT}`));
+    startupCategory = 'HTTP initialization error';
+    const server = app.listen(PORT, HOST);
     server.requestTimeout = 120000;
     server.headersTimeout = 15000;
     server.on('shutdown', () => { app.locals.shuttingDown = true; });
     require('./utils/lifecycle').installShutdown(server);
   }).catch((error) => {
-    console.error('Backend startup failed', { code: error.code || error.name });
+    const category = error.startupCategory === 'configuration error' ? 'configuration error' : startupCategory;
+    console.error(`Backend startup failed: ${category}`);
     mongoose.disconnect().catch(() => {});
     process.exitCode = 1;
   });

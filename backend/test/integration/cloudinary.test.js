@@ -12,7 +12,7 @@ test('live Cloudinary disposable image and raw asset upload/retrieval/deletion',
   const { cloudinary, uploadAsset, deleteAsset } = require('../../src/config/cloudinary');
   const retry = require('../../src/utils/retry');
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'earn-cloud-test-'));
-  const folder = `backend-integration-tests/integration/${randomUUID()}`;
+  const folder = `earn-task-platform/test/${randomUUID()}`;
   const ownedAssets = [];
   let failure;
   let phase = 'prepare';
@@ -49,7 +49,7 @@ test('live Cloudinary disposable image and raw asset upload/retrieval/deletion',
   } finally {
     for (const asset of ownedAssets) {
       try { if (!(await deleteAsset(asset))) throw new Error('Cleanup unsuccessful'); }
-      catch { failure = new Error('Cloudinary cleanup could not be confirmed; inspect dedicated backend-integration-tests folder'); }
+      catch { failure = new Error('Cloudinary cleanup could not be confirmed; inspect dedicated earn-task-platform/test folder'); }
     }
     await fs.rm(directory, { recursive: true, force: true });
   }

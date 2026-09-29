@@ -1,4 +1,6 @@
 const cloudinary = require('cloudinary').v2;
+const { getCloudinaryFolderPrefix } = require('./cloudinaryPrefix');
+getCloudinaryFolderPrefix(); // Fail configuration at startup, including before local fallback.
 
 // Configure Cloudinary
 cloudinary.config({
@@ -17,6 +19,7 @@ const useCloudinary = () => {
 const retry = require('../utils/retry');
 
 const uploadAsset = async (filePath, options) => {
+  getCloudinaryFolderPrefix();
   try {
     const result = await retry(() => cloudinary.uploader.upload(filePath, { timeout: 30000, overwrite: false, ...options }));
     if (!result.public_id || !result.asset_id || !result.resource_type || !result.secure_url?.startsWith('https://')) throw new Error('Invalid upload response');

@@ -12,8 +12,7 @@ const { protect } = require('../middleware/auth');
 const { upload } = require('../middleware/upload');
 
 router.get('/', protect, getStories);
-router.post('/', protect, upload.single('media'), uploadStory);
+router.post('/', protect, upload.single('media'), require('../middleware/mediaReference')('story'), uploadStory);
 router.post('/:id/view', protect, viewStory);
 
 module.exports = router;
-

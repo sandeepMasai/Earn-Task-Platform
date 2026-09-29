@@ -6,7 +6,7 @@ const { getCoinValue } = require('../utils/coinHelper');
 const fs = require('fs');
 const path = require('path');
 const { getFileUrl, useCloudinary } = require('../middleware/upload');
-const { deleteFromCloudinary } = require('../config/cloudinary');
+const storage = require('../services/storage/storage.service');
 
 // @desc    Get feed
 // @route   GET /api/posts/feed
@@ -152,8 +152,8 @@ exports.uploadPost = async (req, res) => {
     const postType = type || (file.mimetype.startsWith('image/') ? 'image' :
       file.mimetype.startsWith('video/') ? 'video' : 'document');
 
-    if (!['image', 'video', 'document'].includes(postType)) return res.status(400).json({ success: false, error: 'Invalid post type' });
-    if (postType === 'video' && (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) < 10 || Number(videoDuration) > 120)) return res.status(400).json({ success: false, error: 'Video duration must be between 10 and 120 seconds' });
+    if (!['image', 'video', 'document', 'reel'].includes(postType)) return res.status(400).json({ success: false, error: 'Invalid post type' });
+    if (['video', 'reel'].includes(postType) && (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) < 10 || Number(videoDuration) > 120)) return res.status(400).json({ success: false, error: 'Video duration must be between 10 and 120 seconds' });
 
     // Validate video duration (10 seconds minimum, 2 minutes maximum = 120 seconds)
     if (postType === 'video' && videoDuration) {
@@ -183,7 +183,7 @@ exports.uploadPost = async (req, res) => {
 
     if (postType === 'image') {
       postData.imageUrl = fileUrl;
-    } else if (postType === 'video') {
+    } else if (postType === 'video' || postType === 'reel') {
       postData.videoUrl = fileUrl;
       postData.videoDuration = videoDuration ? parseFloat(videoDuration) : null;
     } else if (postType === 'document') {
@@ -500,14 +500,14 @@ exports.deletePost = async (req, res) => {
       post.thumbnailUrl,
     ].filter(Boolean);
 
-    if (post.mediaAsset) await require('../config/cloudinary').deleteAsset(post.mediaAsset);
+    if (post.mediaAsset && post.mediaAsset.provider !== 'r2') await storage.delete(post.mediaAsset);
     for (const fileUrl of post.mediaAsset ? [] : filesToDelete) {
       if (!fileUrl) continue;
 
       if (useCloudinary() && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
         // Delete from Cloudinary
         try {
-          await deleteFromCloudinary(fileUrl);
+          await storage.deleteLegacyUrl(fileUrl);
         } catch (error) {
           console.error('Error deleting from Cloudinary:');
         }
@@ -525,6 +525,7 @@ exports.deletePost = async (req, res) => {
     }
 
     await post.deleteOne();
+    if (post.mediaAsset?.provider === 'r2') await require('../services/storage/mediaLifecycle').retire(post.mediaAsset);
 
     res.json({
       success: true,
@@ -534,4 +535,3 @@ exports.deletePost = async (req, res) => {
     return errorResponse(res, error);
   }
 };
-

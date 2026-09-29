@@ -89,12 +89,17 @@ exports.uploadStory = async (req, res) => {
       });
     }
 
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // Persist retirement intent before publication; a failed Story write cannot
+    // leave an untracked R2 object when the story TTL later removes its record.
+    if (file.asset?.provider === 'r2') await require('../models/Media').updateOne({ _id: file.asset.mediaId }, { $max: { retireAfter: expiresAt } });
     const story = await Story.create({
       user: req.user._id,
       type: type || (file.mimetype.startsWith('image/') ? 'image' : 'video'),
       mediaUrl,
       mediaAsset: file.asset || null,
       videoDuration: videoDuration ? parseFloat(videoDuration) : null,
+      expiresAt,
     });
 
     await story.populate('user', 'name username');
@@ -143,4 +148,3 @@ exports.viewStory = async (req, res) => {
     return errorResponse(res, error);
   }
 };
-

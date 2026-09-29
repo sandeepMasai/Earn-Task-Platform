@@ -196,3 +196,35 @@ loaded automatically. Keep backend credentials out of the mobile app environment
 ## Production readiness
 
 See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for verified results, current deployment blockers, configuration, tests, reconciliation safeguards and rollback steps.
+
+### Cloudinary environment namespaces
+
+Set `CLOUDINARY_FOLDER_PREFIX` explicitly in each deployed environment:
+
+```dotenv
+# Staging (also required when staging runs with NODE_ENV=production)
+CLOUDINARY_FOLDER_PREFIX=earn-task-platform/staging
+# Production: use this value instead
+# CLOUDINARY_FOLDER_PREFIX=earn-task-platform/production
+```
+
+When omitted, the backward-compatible default is `earn-task-platform`, except
+`NODE_ENV=staging` fails startup without an explicit prefix. Empty/invalid values
+fail validation. Leading, trailing and repeated slashes are normalized; URLs,
+traversal segments, backslashes and encoded paths are rejected.
+
+Uploads use `<prefix>/<image|video|raw>/<uuid>`; raw IDs retain their extension.
+Existing stored identities and legacy deletion behavior remain unchanged.
+Prefixes separate newly generated names; they are not Cloudinary permission
+boundaries. Use separate credentials/accounts when access isolation is required.
+
+The opt-in live test only creates random assets under
+`earn-task-platform/test/<run-id>` and attempts cleanup in `finally`, including
+when assertions fail. Normal tests mock the Cloudinary SDK and touch no live assets.
+
+### Provider-independent media storage
+
+See [STORAGE_ARCHITECTURE.md](STORAGE_ARCHITECTURE.md) for the Cloudinary-compatible
+storage service, opt-in private R2 uploads, ownership checks, test-bucket guards,
+cleanup workflow, feature flags and migration plan. Cloudinary remains the default;
+R2 live acceptance requires configured staging credentials.

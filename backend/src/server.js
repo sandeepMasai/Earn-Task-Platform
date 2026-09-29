@@ -78,6 +78,7 @@ app.use('/api/admin/tasks', adminTaskRoutes);
 app.use('/api/creator', creatorRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/follow', followRoutes);
+app.use('/api/media', require('./routes/mediaRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

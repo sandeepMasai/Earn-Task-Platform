@@ -3,8 +3,10 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
-const { uploadAsset, useCloudinary, deleteAsset } = require('../config/cloudinary');
+const { useCloudinary } = require('../config/cloudinary');
+const storage = require('../services/storage/storage.service');
 const fail = require('../utils/httpError');
+
 
 function parseSize(value, fallback) {
   if (!value) return fallback;
@@ -50,12 +52,15 @@ const upload = { single: field => (req, res, next) => parser.single(field)(req, 
   const temporaryPath = file.path;
   try {
     const extension = await validateContent(file, field);
+    const category = file.mimetype.startsWith('image/') ? 'images' : file.mimetype.startsWith('video/') ? 'videos' : 'documents';
+    const provider = storage.providerFor(category);
+    if (provider === 'r2') throw fail(409, 'Use the direct media upload API for R2 uploads');
     if (useCloudinary()) {
       const resourceType = file.mimetype.startsWith('image/') ? 'image' : file.mimetype.startsWith('video/') ? 'video' : 'raw';
-      const result = await uploadAsset(file.path, { resource_type: resourceType, public_id: `earn-task-platform/${resourceType}/${randomUUID()}${resourceType === 'raw' ? '.' + extension : ''}` });
-      file.asset = { publicId: result.public_id, assetId: result.asset_id, resourceType: result.resource_type };
-      file.path = result.secure_url;
-      file.filename = result.public_id;
+      const result = await storage.upload({ filePath: file.path, provider, category, resourceType, extension, mimeType: file.mimetype, size: file.size });
+      file.asset = result;
+      file.path = result.secureUrl;
+      file.filename = result.publicId;
     } else {
       const directory = process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads');
       await fs.promises.mkdir(directory, { recursive: true });
@@ -66,7 +71,7 @@ const upload = { single: field => (req, res, next) => parser.single(field)(req, 
     // Clean files from rejected requests. Successful records retain asset identity.
     res.once('finish', () => {
       if (res.statusCode >= 400) {
-        const cleanup = file.asset ? deleteAsset(file.asset) : fs.promises.unlink(file.path);
+        const cleanup = file.asset ? storage.delete(file.asset) : fs.promises.unlink(file.path);
         Promise.resolve(cleanup).catch(() => console.error('Rejected upload cleanup failed'));
       }
     });

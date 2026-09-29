@@ -57,7 +57,7 @@ router.post('/login', loginValidation, login);
 router.get('/me', protect, getMe);
 router.get('/user/:userId', protect, getUserById);
 router.put('/instagram-id', protect, body('instagramId').isString().bail().trim().notEmpty(), require('../middleware/validateRequest').validate, updateInstagramId);
-router.put('/profile', protect, upload.single('avatar'),
+router.put('/profile', protect, upload.single('avatar'), require('../middleware/mediaReference')('avatar'),
   body('name').optional().isString().bail().trim().notEmpty(),
   body('email').optional().isString().bail().trim().toLowerCase().isEmail(),
   body('username').optional().isString().bail().trim().toLowerCase().notEmpty(),
@@ -68,4 +68,3 @@ router.post('/logout', protect, logout);
 router.post('/refresh', refreshToken);
 
 module.exports = router;
-

@@ -290,6 +290,7 @@ exports.updateProfile = async (req, res) => {
       user.name = name;
     }
 
+    const previousAvatar = user.avatarAsset;
     // Update avatar if provided (file upload will set req.file)
     if (req.file) {
       const avatarUrl = getFileUrl(req.file);
@@ -299,9 +300,12 @@ exports.updateProfile = async (req, res) => {
       }
     } else if (avatar !== undefined) {
       user.avatar = avatar;
+      user.avatarAsset = null;
     }
 
     await user.save();
+
+    if ((req.file || avatar !== undefined) && previousAvatar?.provider === 'r2' && previousAvatar.mediaId !== user.avatarAsset?.mediaId) await require('../services/storage/mediaLifecycle').retire(previousAvatar);
 
     res.json({
       success: true,
@@ -431,4 +435,3 @@ exports.refreshToken = async (req, res) => {
     });
   }
 };
-

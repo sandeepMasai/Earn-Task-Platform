@@ -1,4 +1,9 @@
 function validateProduction(env = process.env) {
+  require('./cloudinaryPrefix').getCloudinaryFolderPrefix(env);
+  const storageConfig = require('../services/storage/config');
+  for (const category of ['images', 'videos', 'reels', 'documents']) {
+    if (storageConfig.providerFor(category, env) === 'r2') storageConfig.r2Config(env);
+  }
   if (env.NODE_ENV !== 'production') return;
   const required = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
   const missing = required.filter(key => !env[key]);

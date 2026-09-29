@@ -20,7 +20,7 @@ const { upload } = require('../middleware/upload');
 
 router.get('/feed', protect, getFeed);
 router.get('/me', protect, getMyPosts);
-router.post('/', protect, upload.single('image'), uploadPost);
+router.post('/', protect, upload.single('image'), require('../middleware/mediaReference')('post'), uploadPost);
 router.post('/:id/like', protect, likePost);
 router.post('/:id/unlike', protect, unlikePost);
 router.get('/:id', protect, getPostById);
@@ -30,4 +30,3 @@ router.post('/:id/comments', protect, addComment);
 router.get('/:id/comments', protect, getComments);
 
 module.exports = router;
-

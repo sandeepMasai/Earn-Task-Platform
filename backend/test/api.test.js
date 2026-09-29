@@ -105,7 +105,7 @@ test('health, auth, token separation, blocking and validation', async () => {
 
 test('all protected routes reject missing tokens; ordinary users cannot access admin APIs', async () => {
   const app = require('../src/server');
-  const mounts = { authRoutes: '/api/auth', taskRoutes: '/api/tasks', walletRoutes: '/api/wallet', postRoutes: '/api/posts', referralRoutes: '/api/referrals', adminRoutes: '/api/admin', adminTaskRoutes: '/api/admin/tasks', creatorRoutes: '/api/creator', storyRoutes: '/api/stories', followRoutes: '/api/follow' };
+  const mounts = { authRoutes: '/api/auth', taskRoutes: '/api/tasks', walletRoutes: '/api/wallet', postRoutes: '/api/posts', referralRoutes: '/api/referrals', adminRoutes: '/api/admin', adminTaskRoutes: '/api/admin/tasks', creatorRoutes: '/api/creator', storyRoutes: '/api/stories', followRoutes: '/api/follow', mediaRoutes: '/api/media' };
   const publicPaths = new Set(['/api/auth/signup', '/api/auth/login', '/api/auth/refresh', '/api/referrals/check/:code', '/api/wallet/withdrawal-settings']);
   let count = 0;
   for (const [file, prefix] of Object.entries(mounts)) {
@@ -343,8 +343,109 @@ test('production health, security headers, real throttling and readiness', async
   status(await request('POST', '/api/posts', user.token, bad), 400);
 });
 
+test('direct media APIs enforce authorization, content, expiry and lifecycle', async t => {
+  const storage = require('../src/services/storage/storage.service');
+  const Media = require('../src/models/Media');
+  const original = { provider: process.env.MEDIA_STORAGE_PROVIDER, private: process.env.R2_PRIVATE_BUCKET, public: process.env.R2_PUBLIC_BASE_URL };
+  process.env.MEDIA_STORAGE_PROVIDER = 'r2'; process.env.R2_PRIVATE_BUCKET = 'true'; delete process.env.R2_PUBLIC_BASE_URL;
+  const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6ZAAAAABJRU5ErkJggg==', 'base64');
+  const body = { category: 'images', mimeType: 'image/png', size: bytes.length, checksum: require('node:crypto').createHash('sha256').update(bytes).digest('base64') };
+  let deleted = 0;
+  t.mock.method(storage, 'presignUpload', async () => ({ url: 'https://storage.invalid/test', method: 'PUT', expiresIn: 300 }));
+  t.mock.method(storage, 'getMetadata', async () => ({ size: bytes.length, mimeType: 'image/png', etag: 'fixture' }));
+  t.mock.method(storage, 'readPrefix', async () => bytes);
+  t.mock.method(storage, 'getUrl', async () => 'https://storage.invalid/download');
+  t.mock.method(storage, 'delete', async () => { deleted++; return true; });
+  try {
+    status(await request('POST', '/api/media/upload/init', null, body), 401);
+    status(await request('POST', '/api/media/upload/init', user.token, { ...body, category: '../images' }), 400);
+    status(await request('POST', '/api/media/upload/init', user.token, { ...body, mimeType: 'text/html' }), 400);
+    status(await request('POST', '/api/media/upload/init', user.token, { ...body, size: 999999999 }), 400);
+    status(await request('POST', '/api/media/upload/init', user.token, { ...body, checksum: 'invalid' }), 400);
+    const init = status(await request('POST', '/api/media/upload/init', user.token, body), 201);
+    const id = init.media.id;
+    assert.ok(!(await Media.findById(id)).storageKey.includes(user.id));
+    for (const [method, route] of [['GET', `/api/media/${id}`], ['GET', `/api/media/${id}/download`], ['GET', `/api/media/${id}/content`], ['DELETE', `/api/media/${id}`], ['POST', `/api/media/${id}/complete`]]) status(await request(method, route, other.token, method === 'POST' ? {} : undefined), 403);
+    status(await request('PATCH', `/api/media/${id}`, other.token, { size: 1 }), 404);
+    assert.equal(deleted, 0);
+    status(await request('GET', `/api/media/${id}/download`, user.token), 409);
+    status(await request('GET', `/api/media/${id}`, user.token), 200);
+    status(await request('POST', `/api/media/${id}/complete`, user.token, {}), 200);
+    status(await request('POST', `/api/media/${id}/complete`, user.token, {}), 200);
+    status(await request('GET', `/api/media/${id}/download`, user.token), 200);
+    const content = await fetch(base + `/api/media/${id}/content`, { headers: { Authorization: `Bearer ${user.token}` }, redirect: 'manual' });
+    assert.equal(content.status, 302); assert.equal(content.headers.get('Location'), 'https://storage.invalid/download');
+    outcomes.push({ method: 'GET', route: `/api/media/${id}/content`, status: content.status });
+    status(await request('POST', '/api/posts', other.token, { mediaId: id }), 403);
+    const attachedPost = status(await request('POST', '/api/posts', user.token, { mediaId: id }), 201);
+    assert.equal(attachedPost.imageUrl, `/api/media/${id}/content`);
+    const published = await fetch(base + `/api/media/${id}/content`, { headers: { Authorization: `Bearer ${other.token}` }, redirect: 'manual' });
+    assert.equal(published.status, 302);
+    status(await request('GET', `/api/media/${id}/download`, other.token), 403);
+    const attachedProfile = status(await request('PUT', '/api/auth/profile', user.token, { mediaId: id }), 200);
+    assert.equal(attachedProfile.user.avatar, `/api/media/${id}/content`);
+    const attachedStory = status(await request('POST', '/api/stories', user.token, { mediaId: id, type: 'image' }), 201);
+    assert.equal(attachedStory.mediaUrl, `/api/media/${id}/content`);
+    status(await request('DELETE', `/api/posts/${attachedPost.id}`, user.token), 200);
+    assert.equal(deleted, 0, 'Avatar/story references retain the shared object');
+    status(await request('DELETE', `/api/media/${id}`, user.token), 202);
+    status(await request('GET', `/api/media/${id}/download`, user.token), 409);
+    await Media.updateOne({ _id: id }, { expiresAt: new Date(0) });
+    status(await request('DELETE', `/api/media/${id}`, user.token), 200);
+    status(await request('DELETE', `/api/media/${id}`, user.token), 200);
+    assert.equal(deleted, 1);
+    const expired = status(await request('POST', '/api/media/upload/init', user.token, body), 201).media.id;
+    await Media.updateOne({ _id: expired }, { expiresAt: new Date(0) });
+    status(await request('POST', `/api/media/${expired}/complete`, user.token, {}), 409);
+    const invalid = status(await request('POST', '/api/media/upload/init', user.token, body), 201).media.id;
+    storage.getMetadata.mock.mockImplementation(async () => ({ size: bytes.length + 1, mimeType: 'image/png' }));
+    status(await request('POST', `/api/media/${invalid}/complete`, user.token, {}), 400);
+    assert.equal((await Media.findById(invalid)).status, 'rejected');
+    // Provider delete failure must leave an inaccessible, retryable state.
+    const deleting = await Media.create({ user: user.id, provider: 'r2', storageKey: 'originals/test/delete-failure.png', category: 'images', mimeType: body.mimeType, size: body.size, checksum: body.checksum, status: 'ready', expiresAt: new Date(0) });
+    storage.delete.mock.mockImplementation(async () => { throw new (require('../src/services/storage/storage.errors').StorageError)(); });
+    status(await request('DELETE', `/api/media/${deleting.id}`, user.token), 502);
+    assert.equal((await Media.findById(deleting.id)).status, 'deleting');
+    status(await request('GET', `/api/media/${deleting.id}/download`, user.token), 409);
+    storage.delete.mock.mockImplementation(async () => true);
+    status(await request('DELETE', `/api/media/${deleting.id}`, user.token), 200);
+    const spoof = status(await request('POST', '/api/media/upload/init', user.token, body), 201).media.id;
+    storage.getMetadata.mock.mockImplementation(async () => ({ size: bytes.length, mimeType: 'image/png' }));
+    storage.readPrefix.mock.mockImplementation(async () => Buffer.from('not an image'));
+    status(await request('POST', `/api/media/${spoof}/complete`, user.token, {}), 400);
+    storage.presignUpload.mock.mockImplementation(async () => { throw new (require('../src/services/storage/storage.errors').StorageError)(); });
+    const failed = await request('POST', '/api/media/upload/init', user.token, body);
+    assert.equal(failed.status, 502); assert.equal(failed.body.error, 'Server error');
+    await User.updateOne({ _id: user.id }, { isActive: false });
+    status(await request('POST', '/api/media/upload/init', user.token, body), 403);
+    await User.updateOne({ _id: user.id }, { isActive: true });
+  } finally {
+    for (const [key, value] of [['MEDIA_STORAGE_PROVIDER', original.provider], ['R2_PRIVATE_BUCKET', original.private], ['R2_PUBLIC_BASE_URL', original.public]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+});
+
+test('R2 cleanup retries failed objects and retires expired unreferenced story media', async t => {
+  const Media = require('../src/models/Media');
+  const storage = require('../src/services/storage/storage.service');
+  const cleanup = require('../scripts/cleanup-media');
+  const sample = { user: user.id, provider: 'r2', category: 'images', mimeType: 'image/png', size: 1, checksum: 'a'.repeat(43) + '=', expiresAt: new Date(0) };
+  const [bad, good, story] = await Media.create([
+    { ...sample, storageKey: 'test/retry-bad', status: 'pending' },
+    { ...sample, storageKey: 'test/retry-good', status: 'pending' },
+    { ...sample, storageKey: 'test/expired-story', status: 'ready', retireAfter: new Date(0) },
+  ]);
+  let fail = true;
+  t.mock.method(storage, 'delete', async asset => { if (fail && asset.storageKey === bad.storageKey) throw Error('Injected provider failure'); return true; });
+  await assert.rejects(cleanup(), /cleanup incomplete/);
+  assert.equal((await Media.findById(bad.id)).status, 'deleting');
+  assert.equal((await Media.findById(good.id)).status, 'deleted');
+  assert.equal((await Media.findById(story.id)).status, 'deleted');
+  fail = false; await cleanup();
+  assert.equal((await Media.findById(bad.id)).status, 'deleted');
+});
+
 test('every declared API endpoint has a successful response test', () => {
-  const mounts = { authRoutes: '/api/auth', taskRoutes: '/api/tasks', walletRoutes: '/api/wallet', postRoutes: '/api/posts', referralRoutes: '/api/referrals', adminRoutes: '/api/admin', adminTaskRoutes: '/api/admin/tasks', creatorRoutes: '/api/creator', storyRoutes: '/api/stories', followRoutes: '/api/follow' };
+  const mounts = { authRoutes: '/api/auth', taskRoutes: '/api/tasks', walletRoutes: '/api/wallet', postRoutes: '/api/posts', referralRoutes: '/api/referrals', adminRoutes: '/api/admin', adminTaskRoutes: '/api/admin/tasks', creatorRoutes: '/api/creator', storyRoutes: '/api/stories', followRoutes: '/api/follow', mediaRoutes: '/api/media' };
   let count = 0;
   for (const [file, prefix] of Object.entries(mounts)) {
     for (const layer of require('../src/routes/' + file).stack.filter(l => l.route)) {

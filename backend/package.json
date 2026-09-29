@@ -12,7 +12,13 @@
     "test:cloudinary": "node --test test/integration/cloudinary.test.js",
     "reconcile": "node scripts/reconcile-wallets.js --dry-run",
     "test:smoke": "node scripts/smoke.js",
-    "test:load": "node --expose-gc scripts/load-test.js"
+    "test:load": "node --expose-gc scripts/load-test.js",
+    "test:r2": "node --test test/integration/r2.test.js",
+    "test:storage-load": "node scripts/storage-load-test.js",
+    "media:cleanup": "node scripts/cleanup-media.js",
+    "migrate:media": "node scripts/migrate-media.js",
+    "test:r2:browser": "R2_BROWSER_TEST=true R2_STAGING_TEST=true node scripts/r2-staging-validation.js",
+    "reconcile:media": "node scripts/reconcile-media.js"
   },
   "keywords": [
     "express",
@@ -22,6 +28,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
+    "@aws-sdk/s3-request-presigner": "^3.1141.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.11.0",
@@ -37,7 +45,8 @@
     "multer": "^2.4.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "playwright": "^1.63.0"
   },
   "engines": {
     "node": ">=20.20 <25"

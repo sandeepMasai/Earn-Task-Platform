@@ -1,21 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, AppState } from 'react-native';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Video, ResizeMode } from 'expo-av';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, AppState } from 'react-native';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useAppDispatch } from '@store/hooks';
 import { completeTask, fetchTaskById } from '@store/slices/taskSlice';
 import { addCoins } from '@store/slices/walletSlice';
-import { updateUserCoins } from '@store/slices/authSlice';
+import { addUserReward } from '@store/slices/authSlice';
 import { formatCoins, formatTime } from '@utils/validation';
-import { validateTaskCompletion } from '@utils/helpers';
-import { COIN_VALUES, VIDEO_WATCH_PERCENTAGE } from '@constants';
+import { taskService } from '@services/taskService';
+import { WatchProgress } from '@services/watchProgress';
+import { Completion } from '@services/completion';
+import type { RootStackParamList } from '@types';
+import type { WatchSession } from '@services/watchTypes';
+import { VIDEO_WATCH_PERCENTAGE } from '@constants';
 import Button from '@components/common/Button';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 
 const VideoPlayerScreen: React.FC = () => {
-  const route = useRoute<any>();
-  const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<RootStackParamList, 'VideoPlayer'>>();
   const dispatch = useAppDispatch();
   const { task } = route.params;
   const videoRef = useRef<Video>(null);
@@ -24,212 +27,83 @@ const VideoPlayerScreen: React.FC = () => {
   const [watchDuration, setWatchDuration] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [canComplete, setCanComplete] = useState(false);
-  const [youtubeOpenedAt, setYoutubeOpenedAt] = useState<number | null>(null);
-  const [timeSpentWatching, setTimeSpentWatching] = useState(0);
-  const appStateRef = useRef(AppState.currentState);
-
-  // Check if video URL is an Instagram URL
-  const isInstagramUrl = task.videoUrl && (
-    task.videoUrl.includes('instagram.com') ||
-    task.videoUrl.includes('instagr.am')
-  );
-
-  // Check if video URL is a YouTube URL
-  const isYouTubeUrl = task.videoUrl && (
-    task.videoUrl.includes('youtube.com') ||
-    task.videoUrl.includes('youtu.be') ||
-    task.videoUrl.includes('youtube.com/shorts')
-  );
-
-  // External URLs that cannot be played directly
+  const sessionRef = useRef<WatchSession | null>(null);
+  const progressRef = useRef<WatchProgress | null>(null);
+  const completionRef = useRef(new Completion());
+  const [sessionReady, setSessionReady] = useState(false);
+  const isInstagramUrl = /(?:instagram\.com|instagr\.am)/i.test(task.videoUrl || '');
+  const isYouTubeUrl = /(?:youtube\.com|youtu\.be)/i.test(task.videoUrl || '');
   const isExternalUrl = isInstagramUrl || isYouTubeUrl;
 
-  // Track app state changes to detect when user returns from YouTube
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (isYouTubeUrl && youtubeOpenedAt) {
-        if (
-          appStateRef.current.match(/inactive|background/) &&
-          nextAppState === 'active'
-        ) {
-          // User returned to app - calculate time spent
-          const timeSpent = Math.floor((Date.now() - youtubeOpenedAt) / 1000);
-          setTimeSpentWatching(timeSpent);
-          
-          // Check if enough time was spent watching
-          const requiredTime = task.videoDuration || 30; // Default 30 seconds
-          const minWatchTime = Math.floor(requiredTime * (VIDEO_WATCH_PERCENTAGE / 100));
-          
-          if (timeSpent >= minWatchTime && !hasCompleted) {
-            // Auto-complete the task
-            handleAutoComplete();
-          } else if (timeSpent > 0) {
-            // Show progress
-            Toast.show({
-              type: 'info',
-              text1: 'Watch Time',
-              text2: `You watched for ${formatTime(timeSpent)}. Need ${formatTime(minWatchTime)} to complete.`,
-            });
+    let mounted = true;
+    sessionRef.current = null;
+    setSessionReady(false);
+    setCanComplete(false);
+    setHasCompleted(false);
+    completionRef.current = new Completion();
+    if (!isExternalUrl) {
+      taskService.startWatch(task.id).then(session => {
+        if (!mounted) return;
+        sessionRef.current = session;
+        progressRef.current = new WatchProgress(task.id, session, taskService, (confirmed, recovered) => {
+          if (!mounted) return;
+          sessionRef.current = confirmed;
+          setCanComplete(confirmed.accumulatedSeconds >= confirmed.requiredWatchSeconds);
+          if (recovered) {
+            setIsPlaying(false);
+            void videoRef.current?.pauseAsync().then(() => videoRef.current?.setPositionAsync(confirmed.playbackPosition * 1000)).catch(() => {});
+            Toast.show({ type: 'info', text1: 'Progress synchronized', text2: 'Resume playback from the saved position.' });
           }
-        }
-      }
-      appStateRef.current = nextAppState;
+        });
+        setCanComplete(session.accumulatedSeconds >= session.requiredWatchSeconds);
+        setSessionReady(true);
+        videoRef.current?.setPositionAsync(session.playbackPosition * 1000).catch(() => {});
+      }).catch(error => Toast.show({ type: 'error', text1: 'Cannot start watch session', text2: error.message }));
+    }
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') { videoRef.current?.pauseAsync(); setIsPlaying(false); }
     });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [isYouTubeUrl, youtubeOpenedAt, hasCompleted, task.videoDuration]);
-
-  // Refresh only this task when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (task.id && !hasCompleted) {
-        dispatch(fetchTaskById(task.id));
-      }
-    }, [task.id, hasCompleted, dispatch])
-  );
-
-  useEffect(() => {
-    // If external URL (Instagram or YouTube), show message and allow opening in browser
-    if (isExternalUrl) {
-      const platform = isInstagramUrl ? 'Instagram' : 'YouTube';
-      Alert.alert(
-        `${platform} Video`,
-        `This video is hosted on ${platform}. Please watch it in the ${platform} app or browser, then return here to complete the task.`,
-        [
-          {
-            text: 'Open in Browser',
-            onPress: async () => {
-              try {
-                const url = task.videoUrl.startsWith('http') 
-                  ? task.videoUrl 
-                  : `https://${task.videoUrl}`;
-                await Linking.openURL(url);
-                // Track when YouTube was opened
-                if (isYouTubeUrl) {
-                  setYoutubeOpenedAt(Date.now());
-                }
-              } catch (error) {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Error',
-                  text2: 'Failed to open video URL',
-                });
-              }
-            },
-          },
-          {
-            text: 'I Watched It',
-            onPress: () => {
-              // Allow manual completion for external videos
-              setCanComplete(true);
-            },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-    }
-  }, [isExternalUrl]);
-
-  useEffect(() => {
-    if (task.videoDuration && watchProgress > 0) {
-      const percentage = (watchProgress / task.videoDuration) * 100;
-      if (percentage >= VIDEO_WATCH_PERCENTAGE && !hasCompleted) {
-        setCanComplete(true);
-      }
-    }
-  }, [watchProgress, task.videoDuration, hasCompleted]);
+    return () => { mounted = false; progressRef.current?.dispose(); progressRef.current = null; subscription.remove(); };
+  }, [task.id, isExternalUrl]);
 
   const handlePlayPause = async () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        await videoRef.current.pauseAsync();
-      } else {
-        await videoRef.current.playAsync();
-      }
-      setIsPlaying(!isPlaying);
-    }
+    if (!videoRef.current || !sessionReady) return;
+    if (isPlaying) await videoRef.current.pauseAsync();
+    else await videoRef.current.playAsync();
+    setIsPlaying(!isPlaying);
   };
 
-  const handlePlaybackStatusUpdate = (status: any) => {
-    if (status.isLoaded) {
-      setWatchProgress(status.positionMillis / 1000);
-      setWatchDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
-    }
-  };
-
-  const handleAutoComplete = async () => {
-    if (hasCompleted) return;
-
+  const handlePlaybackStatusUpdate = async (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    const position = status.positionMillis / 1000;
+    setWatchProgress(position);
+    setWatchDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
+    if (status.didJustFinish) setIsPlaying(false);
+    if (!progressRef.current || hasCompleted || (!status.isPlaying && !status.didJustFinish)) return;
     try {
-      const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
-      const coinsEarned = (result.result as any)?.coins || (result as any).coins || task.coins || COIN_VALUES.WATCH_VIDEO;
-      dispatch(addCoins(coinsEarned));
-      dispatch(updateUserCoins(coinsEarned));
-      setHasCompleted(true);
-      Toast.show({
-        type: 'success',
-        text1: 'Task Completed Automatically!',
-        text2: `You earned ${formatCoins(coinsEarned)} coins!`,
-      });
-      // Refresh task to update completion status
-      await dispatch(fetchTaskById(task.id));
-      setTimeout(() => {
-        navigation.goBack();
-      }, 2000);
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error || 'Failed to complete task',
-      });
+      await progressRef.current.update(position, status.didJustFinish);
+    } catch (error) {
+      await videoRef.current?.pauseAsync();
+      setIsPlaying(false);
+      Toast.show({ type: 'error', text1: 'Watch progress could not be saved', text2: error instanceof Error ? error.message : 'Please reopen the video and try again.' });
     }
   };
 
   const handleCompleteTask = async () => {
-    if (!canComplete || hasCompleted) return;
-
-    // For external videos (Instagram/YouTube), skip validation
-    if (!isExternalUrl) {
-      const isValid = validateTaskCompletion(
-        watchProgress,
-        task.videoDuration || watchDuration,
-        VIDEO_WATCH_PERCENTAGE
-      );
-
-      if (!isValid) {
-        Alert.alert(
-          'Watch More',
-          `You need to watch at least ${VIDEO_WATCH_PERCENTAGE}% of the video to complete this task.`
-        );
-        return;
-      }
-    }
-
+    if (!canComplete || hasCompleted || !sessionRef.current) return;
     try {
-      const result = await dispatch(completeTask({ taskId: task.id })).unwrap();
-      // completeTask returns { taskId, result: { coins, message } }
-      const coinsEarned = (result.result as any)?.coins || (result as any).coins || task.coins || COIN_VALUES.WATCH_VIDEO;
-      dispatch(addCoins(coinsEarned));
-      dispatch(updateUserCoins(coinsEarned));
+      const sessionId = sessionRef.current.sessionId;
+      const result = await completionRef.current.run(
+        async () => (await dispatch(completeTask({ taskId: task.id, data: { sessionId } })).unwrap()).result,
+        coins => { dispatch(addCoins(coins)); dispatch(addUserReward(coins)); }
+      );
+      const coinsEarned = result.coins;
       setHasCompleted(true);
-      Toast.show({
-        type: 'success',
-        text1: 'Task Completed!',
-        text2: `You earned ${formatCoins(coinsEarned)} coins!`,
-      });
-      // Refresh only this task
+      Toast.show({ type: 'success', text1: 'Task completed', text2: `You earned ${formatCoins(coinsEarned)} coins!` });
       await dispatch(fetchTaskById(task.id));
-      setTimeout(() => {
-        navigation.goBack();
-      }, 2000);
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error || 'Failed to complete task',
-      });
+    } catch (error: unknown) {
+      Toast.show({ type: 'error', text1: 'Could not complete task', text2: String(error) });
     }
   };
 
@@ -257,14 +131,12 @@ const VideoPlayerScreen: React.FC = () => {
               style={styles.openButton}
               onPress={async () => {
                 try {
+                  if (!task.videoUrl) return;
                   const url = task.videoUrl.startsWith('http') 
                     ? task.videoUrl 
                     : `https://${task.videoUrl}`;
                   await Linking.openURL(url);
-                  // Track when YouTube was opened
-                  if (isYouTubeUrl) {
-                    setYoutubeOpenedAt(Date.now());
-                  }
+
                 } catch (error) {
                   Toast.show({
                     type: 'error',
@@ -277,22 +149,8 @@ const VideoPlayerScreen: React.FC = () => {
               <Ionicons name="open-outline" size={20} color="#FFFFFF" />
               <Text style={styles.openButtonText}>Open in Browser</Text>
             </TouchableOpacity>
-            {isYouTubeUrl && youtubeOpenedAt && timeSpentWatching > 0 && (
-              <View style={styles.watchTimeInfo}>
-                <Text style={styles.watchTimeText}>
-                  Watch Time: {formatTime(timeSpentWatching)}
-                </Text>
-                {task.videoDuration && (
-                  <Text style={styles.watchTimeText}>
-                    Required: {formatTime(Math.floor(task.videoDuration * (VIDEO_WATCH_PERCENTAGE / 100)))}
-                  </Text>
-                )}
-              </View>
-            )}
             <Text style={styles.instructionText}>
-              {isYouTubeUrl 
-                ? 'Watch the video in YouTube, then return here. Task will complete automatically!'
-                : 'Watch the video, then return here and click "Complete Task"'}
+              External playback cannot earn an automatic watch reward. This task needs an in-app video or an approved proof-review workflow.
             </Text>
           </View>
         ) : task.videoUrl ? (
@@ -302,6 +160,10 @@ const VideoPlayerScreen: React.FC = () => {
             style={styles.video}
             resizeMode={ResizeMode.CONTAIN}
             shouldPlay={false}
+            onLoad={() => {
+              const session = sessionRef.current;
+              if (session) videoRef.current?.setPositionAsync(session.playbackPosition * 1000).catch(() => {});
+            }}
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           />
         ) : (
@@ -315,7 +177,7 @@ const VideoPlayerScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.playButton}
             onPress={handlePlayPause}
-            disabled={!task.videoUrl}
+            disabled={!task.videoUrl || !sessionReady}
           >
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}
@@ -353,7 +215,7 @@ const VideoPlayerScreen: React.FC = () => {
           </View>
           {isInstagramUrl ? (
             <Text style={styles.requirement}>
-              Watch the video in browser, then return to complete
+              External playback requires a separate verification method
             </Text>
           ) : (
             <Text style={styles.requirement}>

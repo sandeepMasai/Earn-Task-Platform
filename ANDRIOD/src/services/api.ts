@@ -1,10 +1,18 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '@constants';
 import { authStorage } from '@utils/storage';
 import { ApiResponse } from '@types';
+import { AuthRefresh } from './authRefresh';
+
+export class ApiError extends Error {
+  constructor(message: string, public status?: number) { super(message); }
+}
+type AuthConfig = InternalAxiosRequestConfig & { _retry?: boolean; _authEpoch?: number };
+const publicAuth = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout']);
 
 class ApiService {
   private client: AxiosInstance;
+  readonly auth: AuthRefresh;
 
   constructor() {
     this.client = axios.create({
@@ -15,10 +23,22 @@ class ApiService {
       },
     });
 
+    this.auth = new AuthRefresh({
+      ...authStorage,
+      clearAuth: () => authStorage.clearAuth(),
+      request: async refreshToken => {
+        const response = await this.client.post('/auth/refresh', { refreshToken });
+        return response.data.data;
+      },
+    });
+
     // Request interceptor to add auth token
     this.client.interceptors.request.use(
-      async (config) => {
+      async (config: AuthConfig) => {
+        if (config._authEpoch !== undefined && config._authEpoch !== this.auth.epoch) throw new ApiError('Session ended', 401);
+        config._authEpoch = this.auth.epoch;
         const token = await authStorage.getToken();
+        if (config._authEpoch !== this.auth.epoch) throw new ApiError('Session ended', 401);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -31,33 +51,17 @@ class ApiService {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 401 && !error.config?._retry) {
-          const refreshToken = await authStorage.getRefreshToken();
-          if (refreshToken) {
-            try {
-              // mark retry to avoid infinite loop
-              (error.config as any)._retry = true;
-              const refreshResponse = await this.client.post('/auth/refresh', { refreshToken });
-              const data: any = refreshResponse.data?.data || refreshResponse.data;
-              if (data?.accessToken) {
-                await authStorage.saveToken(data.accessToken);
-                if (data.expiresAt) {
-                  await authStorage.saveExpiry(data.expiresAt);
-                }
-                // Retry original request with new token
-                const newConfig = { ...error.config };
-                newConfig.headers = newConfig.headers || {};
-                (newConfig.headers as any).Authorization = `Bearer ${data.accessToken}`;
-                return this.client(newConfig);
-              }
-            } catch (refreshError) {
-              await authStorage.clearAuth();
-            }
+        const config = error.config as AuthConfig | undefined;
+        if (error.response?.status === 401 && config && !publicAuth.has(config.url || '')) {
+          if (config._retry) {
+            if (config._authEpoch === this.auth.epoch) await this.auth.logout();
           } else {
-            await authStorage.clearAuth();
+            config._retry = true;
+            const authorization = String(config.headers.Authorization || '');
+            const token = await this.auth.refresh(authorization.replace(/^Bearer /, ''), config._authEpoch ?? this.auth.epoch);
+            config.headers.Authorization = `Bearer ${token}`;
+            return this.client(config);
           }
-        } else {
-          console.log('API Error:', error);
         }
         return Promise.reject(error);
       }
@@ -66,41 +70,26 @@ class ApiService {
 
   async get<T>(url: string, params?: any): Promise<ApiResponse<T>> {
     try {
-      // Suppress logging for feed pagination to reduce noise
-      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
-        console.log('API GET:', `${this.client.defaults.baseURL}${url}`, params);
-      }
       const response = await this.client.get(url, { params });
-      // Suppress logging for feed pagination to reduce noise
-      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
-        console.log('API Response:', response.status, response.data);
-      }
       // Backend returns { success: true, data: ... }
       if (response.data.success) {
         return { success: true, data: response.data.data };
       }
       return response.data;
     } catch (error) {
-      // Only log first few feed errors to reduce noise
-      if (!url.includes('/posts/feed') || (params?.page && params.page <= 2)) {
-        console.error('API GET Error:', error);
-      }
       throw this.handleError(error);
     }
   }
 
   async post<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
     try {
-      console.log('API POST:', `${this.client.defaults.baseURL}${url}`, data);
       const response = await this.client.post(url, data, config);
-      console.log('API Response:', response.status, response.data);
       // Backend returns { success: true, data: ... }
       if (response.data.success) {
         return { success: true, data: response.data.data };
       }
       return response.data;
     } catch (error) {
-      console.error('API POST Error:', error);
       throw this.handleError(error);
     }
   }
@@ -132,21 +121,16 @@ class ApiService {
   }
 
   private handleError(error: any): Error {
-    console.log('API Error:', error);
     if (error.response) {
       // Server responded with error
       const message = error.response.data?.error || error.response.data?.message || 'An error occurred';
-      console.log('Server error:', message, error.response.status);
-      return new Error(message);
+      return new ApiError(message, error.response.status);
     } else if (error.request) {
       // Request made but no response
-      console.log('Network error - no response:', error.request);
-      console.log('API Base URL:', API_BASE_URL);
-      return new Error(`Network error. Cannot connect to server at ${API_BASE_URL}. Please check if backend is running.`);
+      return new ApiError('Network error. Please check your connection.');
     } else {
       // Something else happened
-      console.log('Request setup error:', error.message);
-      return new Error(error.message || 'An unexpected error occurred');
+      return new ApiError(error.message || 'An unexpected error occurred', error.status);
     }
   }
 }

@@ -144,7 +144,9 @@ export interface WalletState {
 
 export interface Transaction {
     id: string;
-    type: 'earned' | 'withdrawn' | 'bonus' | 'referral';
+    type: 'earned' | 'withdrawn' | 'bonus' | 'referral' | 'refund' | 'reconciliation';
+    direction?: 'credit' | 'debit';
+    _id?: string;
     amount: number;
     description: string;
     createdAt: string;

@@ -116,6 +116,14 @@ const authSlice = createSlice({
     name: 'auth',
     initialState,
     reducers: {
+        accessRefreshed: (state, action: PayloadAction<{ accessToken: string; expiresAt?: string }>) => {
+            if (!state.isAuthenticated) return;
+            state.token = action.payload.accessToken;
+            if (action.payload.expiresAt) state.expiresAt = action.payload.expiresAt;
+        },
+        addUserReward: (state, action: PayloadAction<number>) => {
+            if (state.user) state.user.coins += action.payload;
+        },
         updateUserCoins: (state, action: PayloadAction<number>) => {
             if (state.user) {
                 state.user.coins = action.payload;
@@ -215,6 +223,6 @@ const authSlice = createSlice({
     },
 });
 
-export const { updateUserCoins, setUser, clearAuth } = authSlice.actions;
+export const { updateUserCoins, addUserReward, accessRefreshed, setUser, clearAuth } = authSlice.actions;
 export default authSlice.reducer;
 

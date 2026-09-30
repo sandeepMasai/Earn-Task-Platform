@@ -57,8 +57,10 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    await apiService.post('/auth/logout');
-    await authStorage.clearAuth();
+    // End the local session immediately, including any refresh in flight.
+    const request = apiService.post('/auth/logout').catch(() => {});
+    await apiService.auth.logout();
+    await request;
   },
 
   async getCurrentUser(): Promise<User> {

@@ -1,3 +1,5 @@
+import { transactionSign } from '@utils/transactionDisplay';
+import type { Transaction } from '@types';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -21,7 +23,7 @@ const AdminUserDetailsScreen: React.FC = () => {
 
   const [user, setUser] = useState<AdminUser | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -221,7 +223,7 @@ const AdminUserDetailsScreen: React.FC = () => {
         {transactions.length > 0 ? (
           transactions.slice(0, 20).map((transaction, idx) => (
             <View
-              key={transaction.id || (transaction as any)._id || `tx-${idx}`}
+              key={transaction.id || transaction._id || `tx-${idx}`}
               style={styles.transactionCard}
             >
               <View style={styles.transactionHeader}>
@@ -234,13 +236,11 @@ const AdminUserDetailsScreen: React.FC = () => {
                     styles.transactionAmount,
                     {
                       color:
-                        transaction.type === 'earned' || transaction.type === 'referral'
-                          ? '#34C759'
-                          : '#FF3B30',
+                        transactionSign(transaction) === '-' ? '#FF3B30' : transactionSign(transaction) === '+' ? '#34C759' : '#666666',
                     },
                   ]}
                 >
-                  {transaction.type === 'earned' || transaction.type === 'referral' ? '+' : '-'}
+                  {transactionSign(transaction)}
                   {formatCoins(transaction.amount)}
                 </Text>
               </View>

@@ -18,6 +18,25 @@ npm run android  # Android Emulator
 npm run web      # Web Browser
 ```
 
+These commands use Expo Go explicitly. For Android, start an emulator or connect
+a phone with USB debugging enabled. This project uses Expo SDK 54, so use a
+compatible Expo Go version from [expo.dev/go](https://expo.dev/go).
+
+### Android development build
+
+To test native configuration or features that require your own app binary, install
+Android Studio, the Android SDK, and JDK 17, then run:
+
+```bash
+# Build and install the development app, then start Metro
+npm run android:build
+
+# On later runs, launch the installed development app
+npm run android:dev
+```
+
+Rebuild after adding native dependencies or changing native app configuration.
+
 ### Building for Production
 See [BUILD_GUIDE.md](./BUILD_GUIDE.md) for detailed build instructions.
 
@@ -91,9 +110,9 @@ Earn-Task-Platform/
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js 20.19.4 or higher
 - npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
+- Expo CLI (included with the project; use `npx expo`)
 - iOS Simulator (for Mac) or Android Emulator
 
 ### Installation
@@ -117,17 +136,32 @@ npm start
 
 ### API Configuration
 
-Update the API base URL in `src/constants/index.ts`:
+The app defaults to `https://earn-task-platform.onrender.com/api`. To use the
+local backend over Android USB, create `ANDRIOD/.env.local`:
 
-```typescript
-export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000/api' 
-  : 'https://api.earntaskplatform.com/api';
+```dotenv
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:3000/api
 ```
+
+Keep the backend running (`npm run dev` from `backend`), then run:
+
+```bash
+adb reverse tcp:3000 tcp:3000
+adb reverse tcp:8081 tcp:8081
+npm run android:offline
+```
+
+Restart Metro after creating the environment file and fully reload the app.
+Repeat the forwarding commands after reconnecting the phone. USB forwarding
+connects only the specified ports; it does not give the phone internet access.
+To use the hosted backend again, remove the override and enable Wi-Fi or mobile
+data on the phone. For production builds, use the hosted API URL.
 
 ### Environment Variables
 
-Create a `.env` file (optional) for environment-specific configurations.
+The mobile app reads `EXPO_PUBLIC_API_BASE_URL` from its own environment files;
+`backend/.env` configures only the backend. The API URL may include `/api` or
+omit it. Only put public configuration in `EXPO_PUBLIC_` variables.
 
 ## Key Features Implementation
 
@@ -230,6 +264,27 @@ Create a `.env` file (optional) for environment-specific configurations.
 
 ### Common Issues
 
+**Network connection is unreliable / Networking has been disabled**: Expo could
+not reach its online services. If Expo Go was uninstalled during the attempt,
+first install the [SDK 54 Android version](https://expo.dev/go?sdkVersion=54&platform=android&device=true)
+on your phone. Offline mode cannot download a missing Expo Go app.
+Then connect the phone over USB with USB debugging enabled and run:
+
+```bash
+adb reverse tcp:8081 tcp:8081
+npm run android:offline
+```
+
+This skips Expo's online checks and connects to Metro over USB. Backend API
+connectivity is separate; the app still needs access to its configured API.
+
+**No development build (com.earntaskplatform.app) is installed**: Expo selects a
+development build automatically when `expo-dev-client` is installed. Stop the
+existing Metro server with `Ctrl+C` and run `npm run android` to use Expo Go.
+If you want the development client instead, run `npm run android:build` once
+before using `npm run android:dev`. A production or preview APK does not replace
+a development build.
+
 1. **Metro bundler errors**: Clear cache with `expo start -c`
 2. **Module resolution errors**: Check `babel.config.js` path aliases
 3. **Type errors**: Run `npx tsc --noEmit` to check TypeScript errors
@@ -246,3 +301,21 @@ Create a `.env` file (optional) for environment-specific configurations.
 ## License
 
 Private - All rights reserved
+
+### Client regression checks
+
+Run `npm run typecheck` and `npm test` from `ANDRIOD`. Tests use Node's built-in
+runner and the installed TypeScript compiler, with mocked transport/storage and
+no device, backend, or cloud connections. No native build is performed.
+
+Watch progress comes from the backend's confirmed session state. On a timeout or
+sequence conflict, the player reads the existing session, pauses, and returns to
+its confirmed position; resume playback there. Failed recovery stops rather than
+retrying indefinitely. Expired/replaced sessions require reopening the video.
+Final updates respect the backend's minimum interval. Client-reported playback
+is not independent evidence that a person actually watched the video.
+
+Concurrent unauthorized requests share a refresh. Failed refresh or logout clears
+stored authentication and Redux login state; an in-flight refresh cannot restore
+a logged-out session. Rewards use the completion API's returned amount exactly
+once; that endpoint does not currently return an authoritative total balance.

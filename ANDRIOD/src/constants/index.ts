@@ -1,38 +1,9 @@
-import { Platform } from 'react-native';
-
-const normalizeBaseURL = (host: string): string => {
-  const trimmed = host.replace(/\/+$/, '');
-  return trimmed.includes('://') ? `${trimmed}/api` : `http://${trimmed}:3000/api`;
-};
-
-const getEnvBaseURL = (): string => {
-  if (typeof process === 'undefined' || !process.env) return '';
-  return (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || '').trim();
-};
-
-// Get local IP for network access (override with EXPO_PUBLIC_LOCAL_IP or API_BASE_URL/EXPO_PUBLIC_API_BASE_URL)
-const getLocalIP = (): string => {
-  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_LOCAL_IP) {
-    return process.env.EXPO_PUBLIC_LOCAL_IP;
-  }
-  // Default to your machine's LAN IP so physical devices can reach the backend; override if different
-  return '192.168.1.2';
-};
-
-const getBaseURL = (): string => {
-  const envBase = getEnvBaseURL();
-  if (envBase) {
-    const url = normalizeBaseURL(envBase);
-    console.log('🔗 API Base URL (env override):', url);
-    return url;
-  }
-
-  // Always prefer hosted backend unless explicitly overridden
-  const hosted = 'https://earn-task-platform.onrender.com/api';
-  return hosted;
-};
-
-export const API_BASE_URL = getBaseURL();
+import { normalizeBaseURL } from '../utils/apiUrl';
+// Expo inlines EXPO_PUBLIC variables using direct property references.
+const configuredBaseURL = (process.env.EXPO_PUBLIC_API_BASE_URL || '').trim();
+export const API_BASE_URL = configuredBaseURL
+  ? normalizeBaseURL(configuredBaseURL)
+  : 'https://earn-task-platform.onrender.com/api';
 
 // App Constants
 export const APP_NAME = 'Earn Task Platform';

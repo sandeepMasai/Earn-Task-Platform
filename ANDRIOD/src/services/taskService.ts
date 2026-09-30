@@ -1,7 +1,14 @@
+import type { WatchSession, HeartbeatInput, HeartbeatResult, CompletionResult } from './watchTypes';
 import { apiService } from './api';
 import { Task } from '@types';
 
 export const taskService = {
+  async startWatch(taskId: string): Promise<WatchSession> {
+    return (await apiService.post<WatchSession>(`/tasks/${taskId}/watch/start`, {})).data;
+  },
+  async watchHeartbeat(taskId: string, data: HeartbeatInput): Promise<HeartbeatResult> {
+    return (await apiService.post<HeartbeatResult>(`/tasks/${taskId}/watch/heartbeat`, data)).data;
+  },
   async getTasks(): Promise<Task[]> {
     const response = await apiService.get<Task[]>('/tasks');
     return response.data as Task[];
@@ -12,7 +19,7 @@ export const taskService = {
     return response.data as Task;
   },
 
-  async completeTask(taskId: string, data?: any): Promise<{ coins: number; message: string }> {
+  async completeTask(taskId: string, data?: { sessionId?: string }): Promise<CompletionResult> {
     const response = await apiService.post<{ coins: number; message: string }>(
       `/tasks/${taskId}/complete`,
       data

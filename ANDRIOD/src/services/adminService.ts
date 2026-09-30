@@ -1,3 +1,4 @@
+import type { Transaction } from '@types';
 import { apiService } from './api';
 
 export interface DashboardStats {
@@ -181,10 +182,11 @@ export const adminService = {
   async getUserDetails(id: string): Promise<{
     user: AdminUser;
     withdrawals: Withdrawal[];
-    transactions: any[];
+    transactions: Transaction[];
   }> {
-    const response = await apiService.get<{ user: AdminUser; withdrawals: Withdrawal[]; transactions: any[] }>(`/admin/users/${id}`);
-    return response.data as any;
+    type RawTransaction = Omit<Transaction, 'id'> & { _id: string; id?: string };
+    const response = await apiService.get<{ user: AdminUser; withdrawals: Withdrawal[]; transactions: RawTransaction[] }>(`/admin/users/${id}`);
+    return { ...response.data, transactions: response.data.transactions.map(transaction => ({ ...transaction, id: transaction.id || transaction._id })) };
   },
 
   async blockUser(id: string, isActive: boolean): Promise<AdminUser> {

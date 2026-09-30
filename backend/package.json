@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
+    "test:media-safety": "node --test --test-concurrency=1 test/media-reconciliation.test.js test/migration.test.js",
     "seed": "node src/scripts/seedTasks.js",
     "create-admin": "node src/scripts/createAdmin.js",
     "test:cloudinary": "node --test test/integration/cloudinary.test.js",

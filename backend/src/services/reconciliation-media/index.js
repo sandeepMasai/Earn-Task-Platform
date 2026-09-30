@@ -63,7 +63,7 @@ function extract(model, doc, fields, cloud) {
   }
   return fields.flatMap(field=>valuesAt(doc,field.split('.')).map(x=>located(x.field,x.value)));
 }
-async function reconcile({inventory,references,lookup}) {
+async function reconcile({inventory,references,lookup,environment}) {
   const byIdentity=new Map(),byId=new Map();
   for(const a of inventory){if(!a.asset_id||!a.public_id||!Number.isSafeInteger(a.bytes)||a.bytes<0)throw Error('INVALID_INVENTORY_METADATA');if(byId.has(a.asset_id))throw Error('DUPLICATE_INVENTORY_ASSET');byIdentity.set(identity(a),a);byId.set(a.asset_id,a);}
   const out={completed:true,cloudinaryInventory:inventory.length,dbMediaReferences:0,referencesWithExistingSource:0,missingCloudinarySources:0,unreferencedCloudinaryAssets:0,duplicateDbReferences:0,malformedReferences:0,alreadyR2References:0,externalOrLocalReferences:0,totalReferencedBytes:0,totalInventoryBytes:inventory.reduce((s,a)=>s+a.bytes,0),metadataMismatches:0,references:[],unreferenced:[]};
@@ -98,7 +98,14 @@ async function reconcile({inventory,references,lookup}) {
   }
   out.unreferenced=inventory.filter(a=>!used.has(a.asset_id)).map(a=>({assetId:a.asset_id,identityFingerprint:fingerprint(identity(a)),resourceType:a.resource_type,bytes:a.bytes}));
   out.unreferencedCloudinaryAssets=out.unreferenced.length;
-  out.readiness=out.missingCloudinarySources||out.malformedReferences||out.metadataMismatches?'REVIEW_REQUIRED':'RECONCILIATION READY FOR STAGING MIGRATION';
+  out.environment=['production','staging','test','development'].includes(environment)?environment:'unspecified';
+  out.referencedCloudinaryAssets=used.size;
+  const label=out.environment.toUpperCase();
+  out.readiness=out.missingCloudinarySources||out.malformedReferences||out.metadataMismatches?'REVIEW_REQUIRED'
+    :out.environment==='unspecified'?'ENVIRONMENT_REVIEW_REQUIRED'
+    :!used.size?`${label}: NO REFERENCED CLOUDINARY ASSETS — NO MIGRATION CANDIDATES`
+    :`RECONCILIATION READY FOR ${label} MIGRATION REVIEW`;
+  out.migrationAuthorization=false; // Reconciliation is evidence, never execution authorization.
   out.uniqueCloudinaryIdentities=seenReferences.size;out.referenceCounting='One reference per model/record/normalized identity; same-record URL and embedded metadata coalesced. Duplicate count is additional references across records, including missing sources. Referenced bytes count unique existing assets.';out.writes={r2:0,mongodb:0,cloudinary:0};return out;
 }
 module.exports={definitions,identity,parseUrl,normalize,extract,reconcile};

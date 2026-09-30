@@ -2,9 +2,22 @@
 // Read-only: native MongoDB find/listCollections and authenticated Cloudinary GET only.
 // Never import application models, middleware, storage providers or migration execution.
 const fs=require('node:fs');
+const {randomUUID}=require('node:crypto');
 const path=require('node:path');
 const {MongoClient}=require('mongodb');
 const {definitions,extract,reconcile}=require('../src/services/reconciliation-media');
+const {targetIdentity,fingerprint,inventoryFingerprint,assertFresh,freeze}=require('../src/services/reconciliation-media/migration-safety');
+// Only collect() can issue migration evidence. JSON reports and cached journals cannot mint it.
+const issuedEvidence=new WeakMap();
+function verifyEvidence(result,env){
+  const issued=result&&issuedEvidence.get(result);
+  if(!issued)throw safeFailure('RECONCILIATION_EVIDENCE_NOT_ISSUED');
+  assertFresh(result.generatedAt);
+  if(fingerprint(targetIdentity(env))!==issued.targetFingerprint)throw safeFailure('RECONCILIATION_TARGET_MISMATCH');
+  if(fingerprint(result)!==issued.reportFingerprint||inventoryFingerprint(issued.inventory)!==issued.inventoryFingerprint)throw safeFailure('RECONCILIATION_EVIDENCE_CHANGED');
+  issuedEvidence.delete(result); // One run only; retries/resume require fresh reconciliation.
+  return issued;
+}
 function safeFailure(code,status){return Object.assign(new Error(code),{safeCode:code,httpStatus:status});}
 function cloudReader(env, fetcher=fetch){
   const base=`https://api.cloudinary.com/v1_1/${encodeURIComponent(env.CLOUDINARY_CLOUD_NAME)}/resources`;
@@ -21,12 +34,11 @@ function cloudReader(env, fetcher=fetch){
     }
   };
 }
-async function main(args=process.argv.slice(2)){
-  let out;
-  for(let i=0;i<args.length;i++){if(args[i]==='--out'&&args[i+1]&&!args[i+1].startsWith('--'))out=args[++i];else throw safeFailure('INVALID_ARGUMENTS');}
-  require('dotenv').config({path:path.join(__dirname,'../.env')});
-  for(const key of ['MONGODB_URI','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET'])if(!process.env[key])throw safeFailure('RECONCILIATION_CONFIGURATION_MISSING');
-  const env=process.env,get=cloudReader(env),inventory=[];
+async function collect(env,{forMigration=false}={}){
+  const target=forMigration?targetIdentity(env):null;
+  const generatedAt=new Date().toISOString();
+  for(const key of ['MONGODB_URI','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET'])if(!env[key])throw safeFailure('RECONCILIATION_CONFIGURATION_MISSING');
+  const get=cloudReader(env),inventory=[];
   for(const resource of ['image','video','raw'])for(const type of ['upload','private','authenticated']){
     let cursor;const cursors=new Set();
     do{const page=await get(`/${resource}/${type}`,{max_results:500,next_cursor:cursor});if(!Array.isArray(page.resources))throw safeFailure('INVALID_CLOUDINARY_INVENTORY');inventory.push(...page.resources);cursor=page.next_cursor;if(cursor&&cursors.has(cursor))throw safeFailure('REPEATED_INVENTORY_CURSOR');if(cursor)cursors.add(cursor);}while(cursor);
@@ -43,16 +55,30 @@ async function main(args=process.argv.slice(2)){
         entry.documentsScanned++;references.push(...extract(model,doc,fields,env.CLOUDINARY_CLOUD_NAME));
       }
     }
-    const result=await reconcile({inventory,references,lookup:r=>get(`/${r.resource_type}/${r.type}/${encodeURIComponent(r.public_id)}`,{},true)});
+    const result=await reconcile({inventory,references,environment:env.NODE_ENV,lookup:r=>get(`/${r.resource_type}/${r.type}/${encodeURIComponent(r.public_id)}`,{},true)});
     result.coverage=coverage;result.databaseName=db.databaseName;result.databaseScopeWarning=coverage.every(c=>c.documentsScanned===0)?'All inspected media collections are empty. This result does not validate references in any other database.':null;
     result.modelsWithoutMedia=['CoinConfig','RateLimitBucket','ReconciliationAudit (wallet audit)','Transaction','WatchSession (videoId is a task URL hash)','Withdrawal','WithdrawalSettings'];
     result.verification={method:'Authenticated Cloudinary Admin metadata GET; missing inventory entries confirmed with individual resource GET',contentDownloaded:false,originalContentChecksumVerified:false,scope:'Current image/video/raw assets with upload/private/authenticated delivery; all DB records in projected media fields, including inactive records',consistency:'MongoDB majority reads; no cross-service atomic snapshot',mongoCommands:commands};
-    result.generatedAt=new Date().toISOString();
-    if(out)fs.writeFileSync(out,JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});
-    const {references:details,unreferenced,...summary}=result;
-    console.log(JSON.stringify({...summary,issues:details.filter(r=>r.classification==='missing'||r.classification==='malformed'||r.metadataMismatch)},null,2));
-    return result;
+    result.generatedAt=generatedAt;
+    if(forMigration){
+      if(result.databaseName!==target.databaseName||result.environment!==target.environment||fingerprint(targetIdentity(env))!==fingerprint(target))throw safeFailure('RECONCILIATION_TARGET_MISMATCH');
+      assertFresh(generatedAt);
+      result.migrationBinding={version:1,generation:randomUUID(),targetFingerprint:fingerprint(target),inventoryFingerprint:inventoryFingerprint(inventory),referencesFingerprint:fingerprint(result.references)};
+      freeze(result);freeze(inventory);freeze(target);
+      issuedEvidence.set(result,Object.freeze({target,inventory,targetFingerprint:fingerprint(target),reportFingerprint:fingerprint(result),inventoryFingerprint:inventoryFingerprint(inventory)}));
+    }
+    return {result,inventory};
   }finally{await client.close();}
 }
+async function main(args=process.argv.slice(2)){
+  let out;
+  for(let i=0;i<args.length;i++){if(args[i]==='--out'&&args[i+1]&&!args[i+1].startsWith('--'))out=args[++i];else throw safeFailure('INVALID_ARGUMENTS');}
+  require('dotenv').config({path:path.join(__dirname,'../.env')});
+  const {result}=await collect(process.env);
+  if(out)fs.writeFileSync(out,JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});
+  const {references:details,unreferenced,...summary}=result;
+  console.log(JSON.stringify({...summary,issues:details.filter(r=>r.classification==='missing'||r.classification==='malformed'||r.metadataMismatch)},null,2));
+  return result;
+}
 if(require.main===module)main().catch(e=>{console.error(JSON.stringify({completed:false,error:e.safeCode||'RECONCILIATION_FAILED',databaseErrorCode:typeof e.code==='number'?e.code:undefined,httpStatus:e.httpStatus||null,networkCode:['ENOTFOUND','ECONNREFUSED','ETIMEDOUT'].includes(e.code)?e.code:undefined,writes:{r2:0,mongodb:0,cloudinary:0}}));process.exitCode=1;});
-module.exports={main,cloudReader};
+module.exports={main,collect,cloudReader,verifyEvidence};

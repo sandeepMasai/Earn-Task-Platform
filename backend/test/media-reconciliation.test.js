@@ -1,3 +1,4 @@
+require('./support/media-safety-guard');
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {parseUrl,normalize,extract,reconcile}=require('../src/services/reconciliation-media');
 const a={public_id:'folder/photo',asset_id:'immutable',resource_type:'image',type:'upload',bytes:12,format:'png',version:1};
@@ -28,4 +29,21 @@ test('missing identities also count duplicates and standalone Cloudinary Media i
  const refs=['a','b'].flatMap(c=>extract('Media',{_id:c.repeat(24),provider:'cloudinary',storageKey:'missing',category:'videos',size:9},[],'test'));
  const result=await reconcile({inventory:[],references:refs,lookup:async()=>null});
  assert.equal(result.missingCloudinarySources,2);assert.equal(result.duplicateDbReferences,1);assert.equal(result.uniqueCloudinaryIdentities,1);assert.equal(result.malformedReferences,0);
+});
+for (const environment of ['staging','production']) test(`${environment} readiness uses the actual environment`,async()=>{
+ const references=extract('User',{_id:'a'.repeat(24),avatar:url},['avatar'],'test');
+ const r=await reconcile({inventory:[a],references,environment,lookup:async()=>assert.fail()});
+ assert.equal(r.environment,environment);
+ assert.equal(r.readiness,`RECONCILIATION READY FOR ${environment.toUpperCase()} MIGRATION REVIEW`);
+ assert.equal(r.referencedCloudinaryAssets,1);
+});
+test('zero production references never imply migration readiness',async()=>{
+ const inventory=Array.from({length:358},(_,i)=>({...a,asset_id:`asset-${i}`,public_id:`unused-${i}`}));
+ const r=await reconcile({inventory,references:[],environment:'production',lookup:async()=>assert.fail()});
+ assert.equal(r.readiness,'PRODUCTION: NO REFERENCED CLOUDINARY ASSETS — NO MIGRATION CANDIDATES');
+ assert.equal(r.referencedCloudinaryAssets,0);assert.equal(r.unreferencedCloudinaryAssets,358);assert.equal(r.totalReferencedBytes,0);
+});
+test('unknown environment cannot report migration readiness',async()=>{
+ const r=await reconcile({inventory:[a],references:extract('User',{_id:'a'.repeat(24),avatar:url},['avatar'],'test'),lookup:async()=>assert.fail()});
+ assert.equal(r.readiness,'ENVIRONMENT_REVIEW_REQUIRED');
 });

@@ -7,17 +7,23 @@ const { createHash } = require('node:crypto');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { targetIdentity, fingerprint, assertFresh } = require('../src/services/reconciliation-media/migration-safety');
+const { parseUrl } = require('../src/services/reconciliation-media');
+const { verifyEvidence } = require('./reconcile-media');
 const digest = value => createHash('sha256').update(value).digest('hex');
 function options(args, env) {
-  const allowed = new Set(['--dry-run', '--execute', '--confirm', '--journal']);
+  const allowed = new Set(['--dry-run', '--execute', '--confirm', '--confirm-production', '--journal']);
   for (let i = 0; i < args.length; i++) { if (!allowed.has(args[i])) throw new Error('Unknown option'); if (args[i] === '--journal') { if (!args[++i] || args[i].startsWith('--')) throw new Error('Journal path required'); } }
   const execute = args.includes('--execute');
   const journal = args.includes('--journal') ? args[args.indexOf('--journal') + 1] : undefined;
   if (execute && (args.includes('--dry-run') || env.MEDIA_MIGRATION_EXECUTE !== 'true' || !args.includes('--confirm') || !journal || env.MEDIA_MIGRATION_BUCKET_CONFIRM !== env.R2_BUCKET)) throw new Error('Execution requires MEDIA_MIGRATION_EXECUTE=true, MEDIA_MIGRATION_BUCKET_CONFIRM matching R2_BUCKET, --execute --confirm --journal PATH (no --dry-run)');
+  if (execute && env.NODE_ENV === 'production' && !args.includes('--confirm-production')) throw new Error('Execution requires explicit production confirmation: --confirm-production');
+  if (execute && !['production', 'staging', 'test'].includes(env.NODE_ENV)) throw new Error('Execution requires a recognized environment');
+  if (args.includes('--confirm-production') && env.NODE_ENV !== 'production') throw new Error('Production confirmation does not match runtime environment');
   // Production execution is deliberately unavailable in this validation phase.
   if (execute && (env.NODE_ENV === 'production' || !/(?:^|[-_])(staging|test)(?:$|[-_])/.test(env.R2_BUCKET || ''))) throw new Error('Production migration is disabled');
   if (execute && (!/(?:^|[-_/])(staging|test)(?:$|[-_/])/.test(env.CLOUDINARY_FOLDER_PREFIX || '') || env.MEDIA_MIGRATION_SOURCE_CONFIRM !== env.CLOUDINARY_FOLDER_PREFIX)) throw new Error('Execution requires an explicitly confirmed staging/test Cloudinary prefix');
-  return { execute, journal };
+  return { execute, journal, executionArgs: args };
 }
 function plan(asset, cloud) {
   const identity = [cloud, asset.resource_type, asset.type, asset.asset_id, asset.version].join(':');
@@ -30,7 +36,7 @@ function plan(asset, cloud) {
   return { key, identity: digest(identity), bytes: asset.bytes, reason };
 }
 async function hashBody(body) { const h = createHash('sha256'); let size = 0; for await (const chunk of body) { h.update(chunk); size += chunk.length; } return { hash: h.digest('hex'), size }; }
-async function copy(asset, item, provider, previous) {
+async function copy(asset, item, provider, previous, validateRuntime) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'earn-media-migration-'));
   try {
     const response = await fetch(asset.secure_url, { redirect: 'error', signal: AbortSignal.timeout(120000) });
@@ -43,6 +49,7 @@ async function copy(asset, item, provider, previous) {
     const exists = await provider.exists({ storageKey: item.key });
     // A destination not claimed in this journal is a conflict, never an overwrite.
     if (exists && !previous) throw new Error('DESTINATION_CONFLICT');
+    validateRuntime();
     if (!exists) await provider.upload({ filePath: file, storageKey: item.key, mimeType: response.headers.get('content-type')?.split(';')[0] || 'application/octet-stream', size });
     const object = await provider.send(new GetObjectCommand({ Bucket: provider.config.bucket, Key: item.key }));
     const verified = await hashBody(object.Body);
@@ -50,65 +57,89 @@ async function copy(asset, item, provider, previous) {
     return { checksum, bytes: size };
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
-async function run({ source, provider, cloud, execute = false, journal, output = console.log, copyAsset = copy }) {
-  const summary = { mode: execute ? 'EXECUTE' : 'DRY_RUN', total: 0, eligible: 0, skipped: 0, conflicts: 0, estimatedBytes: 0, wouldMigrate: 0, migrated: 0, failed: 0, assets: [] };
-  let states = {}, lock;
-  const scope = digest(cloud + ':' + provider.config.accountId + ':' + provider.config.bucket);
-  if (execute) {
-    lock = fs.openSync(journal + '.lock', 'wx', 0o600);
-    try { if (fs.existsSync(journal)) { const data = JSON.parse(fs.readFileSync(journal, 'utf8')); if (data.scope !== scope) throw new Error('Journal scope mismatch'); states = data.assets; } }
-    catch (e) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); throw e; }
+async function run(input) {
+  // Runtime configuration is the authority. Callers cannot supply alternate destinations or sources.
+  for (const key of ['provider','source','env','cloud','copyAsset']) if (Object.hasOwn(input,key)) throw new Error('MIGRATION_OVERRIDE_FORBIDDEN');
+  const { execute = false, journal, output = console.log, reconciliation, executionArgs = [] } = input;
+  const env = Object.freeze({ ...process.env });
+  if (typeof execute !== 'boolean') throw new Error('INVALID_EXECUTION_MODE');
+  const authorized = options(executionArgs, env);
+  if (authorized.execute !== execute || (execute && authorized.journal !== journal)) throw new Error('Execution requires matching CLI authorization and journal');
+  const issued = verifyEvidence(reconciliation, env);
+  const { inventory, target } = issued;
+  const cloud = target.cloud;
+  if (!reconciliation?.completed || !Array.isArray(reconciliation.references)) throw new Error('RECONCILIATION_REQUIRED');
+  if (reconciliation.missingCloudinarySources || reconciliation.malformedReferences || reconciliation.metadataMismatches) throw new Error('RECONCILIATION_REVIEW_REQUIRED');
+  const referenced = new Map(reconciliation.references.filter(r => r.classification === 'exists' && !r.metadataMismatch).map(r => [r.metadata.assetId, r.metadata]));
+  const summary = { mode: execute ? 'EXECUTE' : 'DRY_RUN', environment: reconciliation.environment, readiness: reconciliation.readiness, referencedAssets: referenced.size, unreferencedAssets: reconciliation.unreferencedCloudinaryAssets, total: 0, eligible: 0, skipped: 0, conflicts: 0, estimatedBytes: 0, wouldMigrate: 0, migrated: 0, failed: 0, assets: [] };
+  // Validate the complete referenced source set before any journal, destination read or copy.
+  for (const asset of inventory) {
+    if (!referenced.has(asset.asset_id)) continue;
+    if (!asset.public_id.startsWith(target.prefix + '/')) throw new Error('SOURCE_OUTSIDE_RECONCILED_SCOPE');
+    const urlIdentity = parseUrl(asset.secure_url, cloud);
+    if (urlIdentity.kind !== 'cloudinary' || urlIdentity.public_id !== asset.public_id || urlIdentity.resource_type !== asset.resource_type || urlIdentity.type !== asset.type || (urlIdentity.version && String(urlIdentity.version) !== String(asset.version))) throw new Error('SOURCE_URL_SCOPE_MISMATCH');
+    const ref = referenced.get(asset.asset_id);
+    if (ref.version !== asset.version || ref.bytes !== asset.bytes || ref.resourceType !== asset.resource_type || ref.deliveryType !== asset.type) throw new Error('SOURCE_CHANGED_SINCE_RECONCILIATION');
   }
-  function save() { const temp = journal + '.tmp'; const fd = fs.openSync(temp, 'w', 0o600); try { fs.writeFileSync(fd, JSON.stringify({ version: 1, scope, assets: states }, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } fs.renameSync(temp, journal); }
-  const seen = new Set();
+  const inventoried = new Set(inventory.map(a => a.asset_id));
+  if ([...referenced.keys()].some(id => !inventoried.has(id))) throw new Error('REFERENCED_SOURCE_NOT_IN_INVENTORY');
+  if (execute && !referenced.size) throw new Error('NO_REFERENCED_MIGRATION_CANDIDATES');
+  const provider = new (require('../src/services/storage/r2.provider'))({ env });
+  let states = {}, lock;
+  const scope = fingerprint({target,inventory:issued.inventoryFingerprint,references:reconciliation.migrationBinding.referencesFingerprint});
+  // Revalidate against the actual runtime, not confirmation settings, immediately before work.
+  function validateRuntime() {
+    assertFresh(reconciliation.generatedAt);
+    if (fingerprint(targetIdentity(process.env)) !== issued.targetFingerprint || fingerprint(targetIdentity(env)) !== issued.targetFingerprint || provider.config.accountId !== target.accountId || provider.config.bucket !== target.bucket) throw new Error('MIGRATION_RUNTIME_CHANGED');
+  }
   try {
-    for await (const asset of source()) {
-      summary.total++;
-      const item = plan(asset, cloud), record = { destinationKey: item.key, bytes: item.bytes, status: item.reason || 'eligible' };
-      summary.assets.push(record);
-      if (item.reason) { summary.skipped++; continue; }
-      if (seen.has(item.key)) { summary.conflicts++; record.status = 'duplicate_source_identity'; continue; }
-      seen.add(item.key);
-      let exists;
-      try { exists = await provider.exists({ storageKey: item.key }); }
-      catch { summary.failed++; record.status = 'destination_inspection_failed'; continue; }
-      if (exists && (!execute || !states[item.identity])) { summary.conflicts++; record.status = 'destination_exists'; continue; }
-      summary.eligible++; summary.estimatedBytes += item.bytes; summary.wouldMigrate++;
-      if (!execute) continue;
-      const previous = states[item.identity];
-      states[item.identity] = { ...previous, key: item.key, status: 'pending' }; save();
-      let done = false;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try { const result = await copyAsset(asset, item, provider, exists ? previous : states[item.identity]); states[item.identity] = { key: item.key, status: 'verified', ...result }; save(); record.status = 'verified'; summary.migrated++; done = true; break; }
-        catch { states[item.identity] = { ...states[item.identity], status: 'failed', attempts: attempt }; save(); if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 500)); }
-      }
-      if (!done) { summary.failed++; record.status = 'copy_or_verification_failed'; }
+    validateRuntime();
+    if (execute) {
+      lock = fs.openSync(journal + '.lock', 'wx', 0o600);
+      try { if (fs.existsSync(journal)) { const data = JSON.parse(fs.readFileSync(journal, 'utf8')); if (data.scope !== scope) throw new Error('Journal scope mismatch'); states = data.assets; } }
+      catch (e) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); throw e; }
     }
-  } finally { if (lock !== undefined) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); } }
-  output(JSON.stringify(summary, null, 2));
-  return summary;
+    function save() { const temp = journal + '.tmp'; const fd = fs.openSync(temp, 'w', 0o600); try { fs.writeFileSync(fd, JSON.stringify({ version: 1, scope, assets: states }, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } fs.renameSync(temp, journal); }
+    const seen = new Set();
+    try {
+      for (const asset of inventory) {
+        validateRuntime();
+        summary.total++;
+        const item = plan(asset, cloud), record = { destinationKey: item.key, bytes: item.bytes, status: item.reason || 'eligible' };
+        summary.assets.push(record);
+        const evidence = referenced.get(asset.asset_id);
+        if (!evidence) { summary.skipped++; record.status = 'unreferenced_not_authorized'; continue; }
+        if (item.reason) { summary.skipped++; continue; }
+        if (seen.has(item.key)) { summary.conflicts++; record.status = 'duplicate_source_identity'; continue; }
+        seen.add(item.key);
+        let exists;
+        try { exists = await provider.exists({ storageKey: item.key }); }
+        catch { summary.failed++; record.status = 'destination_inspection_failed'; continue; }
+        validateRuntime();
+        if (exists && (!execute || !states[item.identity])) { summary.conflicts++; record.status = 'destination_exists'; continue; }
+        summary.eligible++; summary.estimatedBytes += item.bytes; summary.wouldMigrate++;
+        if (!execute) continue;
+        const previous = states[item.identity];
+        states[item.identity] = { ...previous, key: item.key, status: 'pending' }; save();
+        let done = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try { validateRuntime(); const result = await copy(asset, item, provider, exists ? previous : states[item.identity], validateRuntime); states[item.identity] = { key: item.key, status: 'verified', ...result }; save(); record.status = 'verified'; summary.migrated++; done = true; break; }
+          catch { states[item.identity] = { ...states[item.identity], status: 'failed', attempts: attempt }; save(); if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 500)); }
+        }
+        if (!done) { summary.failed++; record.status = 'copy_or_verification_failed'; }
+      }
+    } finally { if (lock !== undefined) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); } }
+    output(JSON.stringify(summary, null, 2));
+    return summary;
+  } finally { provider.client.destroy(); }
 }
 async function main() {
   require('dotenv').config({ path: path.join(__dirname, '../.env') });
   const opts = options(process.argv.slice(2), process.env);
   for (const key of ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) if (!process.env[key]) throw new Error('Cloudinary source configuration required');
-  // Inventory does not assert bucket privacy or write anything. Execution requires the provider's private-mode guard.
-  const providerEnv = opts.execute ? process.env : { ...process.env, R2_PRIVATE_BUCKET: 'true', R2_PUBLIC_BASE_URL: '' };
-  const provider = new (require('../src/services/storage/r2.provider'))({ env: providerEnv });
-  async function* source() {
-    for (const resource_type of ['image', 'video', 'raw']) for (const type of ['upload', 'private', 'authenticated']) {
-      let next_cursor;
-      do {
-        const url = new URL(`https://api.cloudinary.com/v1_1/${encodeURIComponent(process.env.CLOUDINARY_CLOUD_NAME)}/resources/${resource_type}/${type}`);
-        url.searchParams.set('max_results', '500'); if (opts.execute) url.searchParams.set('prefix', process.env.CLOUDINARY_FOLDER_PREFIX + '/'); if (next_cursor) url.searchParams.set('next_cursor', next_cursor);
-        const response = await fetch(url, { headers: { Authorization: 'Basic ' + Buffer.from(process.env.CLOUDINARY_API_KEY + ':' + process.env.CLOUDINARY_API_SECRET).toString('base64') }, signal: AbortSignal.timeout(30000), redirect: 'error' });
-        if (!response.ok) throw Object.assign(new Error('Source inventory denied'), { httpStatus: response.status });
-        const page = await response.json(); for (const asset of page.resources) yield asset; next_cursor = page.next_cursor;
-      } while (next_cursor);
-    }
-  }
-  try { const report = await run({ source, provider, cloud: process.env.CLOUDINARY_CLOUD_NAME, ...opts }); if (report.failed) process.exitCode = 1; }
-  finally { provider.client.destroy(); }
+  const {result: reconciliation} = await require('./reconcile-media').collect(process.env,{forMigration:true});
+  const report = await run({ reconciliation, ...opts });
+  if (report.failed || report.conflicts) process.exitCode = 1;
 }
 if (require.main === module) main().catch(error => { console.error(JSON.stringify({ status: 'BLOCKED', httpStatus: error.httpStatus || null, network: ['ENOTFOUND','ECONNREFUSED','ETIMEDOUT'].includes(error.cause?.code) ? error.cause.code : error.name === 'TimeoutError' ? 'TIMEOUT' : undefined })); console.error('Migration BLOCKED: source/destination access, configuration or journal failed; provider details suppressed. No Cloudinary deletes or database changes performed.'); process.exitCode = 1; });
-module.exports = { options, plan, run, copy };
+module.exports = { options, plan, run };

@@ -4,16 +4,21 @@ import { Task } from '@types';
 import { formatCoins } from '@utils/validation';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
+
 interface TaskCardProps {
     task: Task;
     onPress: () => void;
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onPress }) => {
+    const token = useAppSelector((state) => state.auth.token);
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
             {task.thumbnail && (
-                <Image source={{ uri: task.thumbnail }} style={styles.thumbnail} />
+                <AuthenticatedImage source={task.thumbnail} style={styles.thumbnail} />
             )}
             <View style={styles.content}>
                 <View style={styles.header}>

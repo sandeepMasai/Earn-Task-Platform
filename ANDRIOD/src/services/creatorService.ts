@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { mediaService } from './mediaService';
 
 export interface CreatorDashboard {
   creatorWallet: number;
@@ -55,20 +56,29 @@ export const creatorService = {
   },
 
   async requestCoins(coins: number, paymentProofUri: string): Promise<{ message: string; requestId: string; coins: number; amount: number }> {
-    const formData = new FormData();
-    formData.append('coins', coins.toString());
-    formData.append('paymentProof', {
-      uri: paymentProofUri,
-      type: 'image/jpeg',
-      name: 'payment.jpg',
-    } as any);
+    try {
+      const { mediaId } = await mediaService.uploadAvatar({ uri: paymentProofUri });
+      const response = await apiService.post<{ message: string; requestId: string; coins: number; amount: number }>('/creator/request-coins', {
+        coins,
+        mediaId,
+      });
+      return response.data as any;
+    } catch {
+      const formData = new FormData();
+      formData.append('coins', coins.toString());
+      formData.append('paymentProof', {
+        uri: paymentProofUri,
+        type: 'image/jpeg',
+        name: 'payment.jpg',
+      } as any);
 
-    const response = await apiService.post<{ message: string; requestId: string; coins: number; amount: number }>('/creator/request-coins', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data as any;
+      const response = await apiService.post<{ message: string; requestId: string; coins: number; amount: number }>('/creator/request-coins', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data as any;
+    }
   },
 
   async getCoinRequests(): Promise<CreatorCoinRequest[]> {

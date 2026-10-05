@@ -50,14 +50,7 @@ export const signupUser = createAsyncThunk(
         { rejectWithValue }
     ) => {
         try {
-            const response = await authService.signup(email, password, name, username, referralCode);
-            await authStorage.saveToken(response.accessToken);
-            await authStorage.saveRefreshToken(response.refreshToken);
-            if (response.expiresAt) {
-                await authStorage.saveExpiry(response.expiresAt);
-            }
-            await authStorage.saveUser(response.user);
-            return response;
+            await authService.signup(email, password, name, username, referralCode);
         } catch (error: any) {
             return rejectWithValue(error.message);
         }
@@ -165,13 +158,13 @@ const authSlice = createSlice({
             .addCase(signupUser.pending, (state) => {
                 state.isLoading = true;
             })
-            .addCase(signupUser.fulfilled, (state, action) => {
+            .addCase(signupUser.fulfilled, (state) => {
                 state.isLoading = false;
-                state.user = action.payload.user;
-                state.token = action.payload.accessToken;
-                state.refreshToken = action.payload.refreshToken;
-                state.expiresAt = action.payload.expiresAt;
-                state.isAuthenticated = true;
+                state.user = null;
+                state.token = null;
+                state.refreshToken = null;
+                state.expiresAt = null;
+                state.isAuthenticated = false;
             })
             .addCase(signupUser.rejected, (state) => {
                 state.isLoading = false;

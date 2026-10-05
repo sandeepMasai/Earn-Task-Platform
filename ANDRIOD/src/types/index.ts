@@ -5,6 +5,8 @@ export interface User {
     name: string;
     username: string;
     avatar?: string | null;
+    avatarAsset?: { provider?: string; mediaId?: string; storageKey?: string; [key: string]: any } | null;
+    mediaAsset?: { provider?: string; mediaId?: string; storageKey?: string; [key: string]: any } | null;
     instagramId?: string;
     coins: number;
     totalEarned: number;
@@ -250,6 +252,8 @@ export type RootStackParamList = {
     Splash: undefined;
     Onboarding: undefined;
     Login: undefined;
+    ForgotPassword: { email?: string } | undefined;
+    ResetPassword: { email: string; resetToken: string };
     Signup: undefined;
     InstagramId: undefined;
     MainTabs: undefined;

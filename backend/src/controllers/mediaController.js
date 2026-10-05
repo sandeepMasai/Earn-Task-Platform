@@ -42,28 +42,82 @@ exports.complete = wrap(async (req, res) => {
   }
   res.json({ success: true, data: view(updated) });
 });
-exports.metadata = wrap(async (req, res) => res.json({ success: true, data: view(await owned(req)) }));
-exports.download = wrap(async (req, res) => {
-  const media = await owned(req);
-  if (media.status !== 'ready') throw fail(409, 'Media is not ready');
-  res.json({ success: true, data: { url: await storage.getUrl(media, { expiresIn: 300 }, { requestId: req.mediaRequestId }), expiresIn: 300 } });
-});
-// Feed/story/profile publication grants authenticated read access only. Mutations
-// and the private download API still require ownership.
-exports.content = wrap(async (req, res) => {
-  if (!/^[a-f0-9-]{36}$/.test(req.params.id || '')) throw fail(404, 'Media not found');
-  const media = await Media.findById(req.params.id);
+async function authorizeMediaAccess(req, mediaId) {
+  if (!/^[a-f0-9-]{36}$/.test(mediaId || '')) throw fail(404, 'Media not found');
+  const media = await Media.findById(mediaId);
   if (!media) throw fail(404, 'Media not found');
-  if (String(media.user) !== String(req.user._id)) {
-    const published = await Promise.all([
+  if (String(media.user) !== String(req.user._id) && req.user.role !== 'admin') {
+    const [publishedPost, publishedStory, publishedAvatar, submission] = await Promise.all([
       require('../models/Post').exists({ 'mediaAsset.mediaId': media.id, isActive: true }),
       require('../models/Story').exists({ 'mediaAsset.mediaId': media.id, isActive: true, expiresAt: { $gt: new Date() } }),
       require('../models/User').exists({ 'avatarAsset.mediaId': media.id, isActive: true }),
+      require('../models/TaskSubmission').findOne({ 'proofAsset.mediaId': media.id }),
     ]);
-    if (!published.some(Boolean)) throw fail(403, 'Media belongs to another user');
+
+    let isAuthorized = Boolean(publishedPost || publishedStory || publishedAvatar);
+
+    if (!isAuthorized && submission) {
+      const task = await require('../models/Task').findById(submission.task);
+      if (task && String(task.createdBy) === String(req.user._id)) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      console.warn(`[MediaAuth] Authorization denied: user=${req.user._id} role=${req.user.role} mediaId=${media.id}`);
+      throw fail(403, 'Media belongs to another user');
+    }
   }
   if (media.status !== 'ready') throw fail(409, 'Media is not ready');
-  res.redirect(302, await storage.getUrl(media, { expiresIn: 300 }, { requestId: req.mediaRequestId }));
+  return media;
+}
+
+exports.metadata = wrap(async (req, res) => res.json({ success: true, data: view(await owned(req)) }));
+
+// Generates a short-lived signed GET URL for in-app media playback and display
+exports.getUrl = wrap(async (req, res) => {
+  const media = await authorizeMediaAccess(req, req.params.id);
+  const signedUrl = await storage.getUrl(media, { expiresIn: 300, disposition: 'inline' }, { requestId: req.mediaRequestId });
+  res.json({
+    success: true,
+    url: signedUrl,
+    expiresIn: 300,
+    data: {
+      url: signedUrl,
+      expiresIn: 300,
+      mimeType: media.mimeType,
+      size: media.size,
+    },
+  });
+});
+
+exports.download = wrap(async (req, res) => {
+  const media = await owned(req);
+  if (media.status !== 'ready') throw fail(409, 'Media is not ready');
+  const signedUrl = await storage.getUrl(media, { expiresIn: 300, disposition: 'attachment' }, { requestId: req.mediaRequestId });
+  res.json({
+    success: true,
+    url: signedUrl,
+    expiresIn: 300,
+    data: {
+      url: signedUrl,
+      expiresIn: 300,
+      mimeType: media.mimeType,
+      size: media.size,
+    },
+  });
+});
+
+// Feed/story/profile publication grants authenticated read access only.
+exports.content = wrap(async (req, res) => {
+  const media = await authorizeMediaAccess(req, req.params.id);
+  const signedUrl = await storage.getUrl(media, { expiresIn: 300, disposition: 'inline' }, { requestId: req.mediaRequestId });
+  res.set('Accept-Ranges', 'bytes');
+  if (media.mimeType) {
+    res.set('Content-Type', media.mimeType);
+  }
+  res.set('Location', signedUrl);
+  return res.status(302).end();
 });
 exports.remove = wrap(async (req, res) => {
   const media = await owned(req);

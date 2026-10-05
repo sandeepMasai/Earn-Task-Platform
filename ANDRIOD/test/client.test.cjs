@@ -90,3 +90,69 @@ test('API retries protected requests once, shares refresh, and prevents recursiv
  token='old';denyRefresh=true;await assert.rejects(apiService.get('/tasks'));assert.equal(refreshCalls,2);assert.equal(clears,1);
  token='old';denyRefresh=false;denyRetry=true;const before=protectedCalls;await assert.rejects(apiService.get('/tasks'));assert.equal(protectedCalls-before,2);assert.equal(clears,2);
 });
+test('registration discards returned credentials and does not persist a session',async()=>{
+ let requests=0;
+ const storage=new Proxy({}, {get:()=>()=>assert.fail('registration must not persist authentication')});
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async(route,body)=>{requests++;assert.equal(route,'/auth/signup');assert.equal(body.username,'fixture');return {data:{accessToken:'fixture-access',refreshToken:'fixture-refresh',user:{id:'fixture'}}};}}},'@utils/storage':{authStorage:storage}});
+ assert.equal(await authService.signup('fixture@example.invalid','fixture-password','Fixture','fixture'),undefined);assert.equal(requests,1);
+});
+test('successful registration keeps protected navigation unauthenticated; login still authenticates',()=>{
+ const initial=authModule.default(undefined,{type:'init'});
+ const signedUp=authModule.default(initial,authModule.signupUser.fulfilled(undefined,'signup',{}));
+ assert.equal(signedUp.isAuthenticated,false);assert.equal(signedUp.token,null);assert.equal(signedUp.refreshToken,null);assert.equal(signedUp.user,null);
+ const loggedIn=authModule.default(signedUp,authModule.loginUser.fulfilled({user:{id:'fixture'},accessToken:'fixture-access',refreshToken:'fixture-refresh'},'login',{}));
+ assert.equal(loggedIn.isAuthenticated,true);assert.equal(loggedIn.token,'fixture-access');
+});
+test('forgot password calls /auth/forgot-password with normalized email',async()=>{
+ const calls=[];
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async(route,body)=>{calls.push({route,body});return {data:{success:true}};}}},'@utils/storage':{authStorage:{}}});
+ await authService.forgotPassword('  User@Example.COM  ');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].route,'/auth/forgot-password');
+ assert.equal(calls[0].body.email,'user@example.com');
+});
+test('verify OTP calls /auth/verify-otp and returns resetToken',async()=>{
+ const calls=[];
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async(route,body)=>{calls.push({route,body});return {data:{success:true,resetToken:'verified-token-64-hex'}};}}},'@utils/storage':{authStorage:{}}});
+ const res=await authService.verifyOtp('  User@Example.COM  ','654321');
+ assert.equal(calls[0].route,'/auth/verify-otp');
+ assert.equal(calls[0].body.email,'user@example.com');
+ assert.equal(calls[0].body.code,'654321');
+ assert.equal(res.resetToken,'verified-token-64-hex');
+});
+test('reset password sends the returned resetToken and newPassword',async()=>{
+ const calls=[];
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async(route,body)=>{calls.push({route,body});return {data:{success:true}};}}},'@utils/storage':{authStorage:{}}});
+ await authService.resetPassword('  User@Example.COM  ','verified-token-64-hex','NewPass123!');
+ assert.equal(calls[0].route,'/auth/reset-password');
+ assert.equal(calls[0].body.email,'user@example.com');
+ assert.equal(calls[0].body.resetToken,'verified-token-64-hex');
+ assert.equal(calls[0].body.newPassword,'NewPass123!');
+});
+test('missing resetToken is handled correctly and throws error',async()=>{
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async()=>({data:{success:true}})}},'@utils/storage':{authStorage:{}}});
+ await assert.rejects(
+  authService.resetPassword('user@example.com','', 'NewPass123!'),
+  /Verification expired|Reset token/i
+ );
+});
+test('wrong OTP remains rejected when backend returns error',async()=>{
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async()=>{throw new Error('Invalid or expired code. Request a new code and try again.');}}},'@utils/storage':{authStorage:{}}});
+ await assert.rejects(
+  authService.verifyOtp('user@example.com','000000'),
+  /Invalid or expired code/i
+ );
+});
+test('no sensitive token or password is logged during password reset flow',async()=>{
+ const logs=[];
+ const capture=(...args)=>logs.push(args.join(' '));
+ const customConsole={log:capture,error:capture,warn:capture,info:capture};
+ const {authService}=load('src/services/authService.ts',{'./api':{apiService:{post:async(route)=>route==='/auth/verify-otp'?{data:{success:true,resetToken:'secret-reset-token-64'}}:{data:{success:true}}}},'@utils/storage':{authStorage:{}}});
+ await authService.forgotPassword('user@example.com');
+ const {resetToken}=await authService.verifyOtp('user@example.com','123456');
+ await authService.resetPassword('user@example.com',resetToken,'MySecretPassword123!');
+ const joined=logs.join('\n');
+ assert.equal(joined.includes('secret-reset-token-64'),false);
+ assert.equal(joined.includes('MySecretPassword123!'),false);
+ assert.equal(joined.includes('123456'),false);
+});

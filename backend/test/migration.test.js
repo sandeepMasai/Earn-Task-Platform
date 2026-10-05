@@ -7,7 +7,7 @@ const path = require('node:path');
 const { Readable } = require('node:stream');
 const { MongoClient } = require('mongodb');
 const R2Provider = require('../src/services/storage/r2.provider');
-const { options, plan, run } = require('../scripts/migrate-media');
+const { options, plan, run, diagnostic } = require('../scripts/migrate-media');
 const { collect } = require('../scripts/reconcile-media');
 const { MAX_EVIDENCE_AGE_MS } = require('../src/services/reconciliation-media/migration-safety');
 const asset = { asset_id:'fixture', public_id:'test/media/image', resource_type:'image', type:'upload', version:1, bytes:3, format:'png', secure_url:'https://res.cloudinary.com/test/image/upload/v1/test/media/image.png' };
@@ -15,7 +15,7 @@ const executionArgs = journal => ['--execute','--confirm','--journal',journal];
 
 // All I/O is mocked. No .env, MongoDB connection, R2 request or Cloudinary request is used.
 function setup(t, { inventory=[asset], referenced=inventory, environment='staging', database='fixture_staging', prefix='test/media' }={}) {
-  const keys=['NODE_ENV','MONGODB_URI','MEDIA_STORAGE_PROVIDER','R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET','R2_PRIVATE_BUCKET','R2_PUBLIC_BASE_URL','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET','CLOUDINARY_FOLDER_PREFIX','MEDIA_MIGRATION_EXECUTE','MEDIA_MIGRATION_BUCKET_CONFIRM','MEDIA_MIGRATION_SOURCE_CONFIRM',...['IMAGES','VIDEOS','REELS','DOCUMENTS'].map(c=>'MEDIA_STORAGE_PROVIDER_'+c)];
+  const keys=['NODE_ENV','MONGODB_URI','MEDIA_STORAGE_PROVIDER','R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET','R2_PRIVATE_BUCKET','R2_PUBLIC_BASE_URL','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET','CLOUDINARY_FOLDER_PREFIX','MEDIA_MIGRATION_EXECUTE','MEDIA_MIGRATION_BUCKET_CONFIRM','MEDIA_MIGRATION_SOURCE_CONFIRM','MEDIA_MIGRATION_SOURCE_PREFIXES','MEDIA_MIGRATION_SOURCE_PREFIXES_CONFIRM',...['IMAGES','VIDEOS','REELS','DOCUMENTS'].map(c=>'MEDIA_STORAGE_PROVIDER_'+c)];
   const previous=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
   for(const k of keys)delete process.env[k];
   const bucket=environment==='production'?'production-media':'media-staging';
@@ -35,7 +35,7 @@ function setup(t, { inventory=[asset], referenced=inventory, environment='stagin
   t.mock.method(R2Provider.prototype,'exists',async()=>false);
   t.mock.method(R2Provider.prototype,'upload',async()=>assert.fail('unexpected provider write'));
   t.mock.method(R2Provider.prototype,'delete',async()=>assert.fail('unexpected provider delete'));
-  t.mock.method(R2Provider.prototype,'send',async()=>assert.fail('unexpected provider request'));
+  t.mock.method(R2Provider.prototype,'send',async command=>{if(command.constructor.name==='HeadBucketCommand')return {};assert.fail('unexpected provider request');});
   return async()=> {t.mock.method(global,'fetch',inventoryFetch);return (await collect(process.env,{forMigration:true})).result;};
 }
 function temporaryJournal(t) {
@@ -109,7 +109,7 @@ test('reproduced provider-override attack rejects production provider and inject
 });
 test('referenced source outside confirmed prefix is rejected independently of provider checks',async t=>{
  const outside={...asset,public_id:'outside/image',secure_url:'https://res.cloudinary.com/test/image/upload/v1/outside/image.png'};
- const issue=setup(t,{inventory:[outside]});const reconciliation=await issue();const {journal,directory}=temporaryJournal(t);
+ const issue=setup(t,{inventory:[outside]});process.env.MEDIA_MIGRATION_SOURCE_PREFIXES='test/media';process.env.MEDIA_MIGRATION_SOURCE_PREFIXES_CONFIRM='test/media';const reconciliation=await issue();const {journal,directory}=temporaryJournal(t);
  await assert.rejects(run({reconciliation,...quiet}),/SOURCE_OUTSIDE_RECONCILED_SCOPE/);
  await assert.rejects(run({reconciliation:await issue(),execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/SOURCE_OUTSIDE_RECONCILED_SCOPE/);
  assert.deepEqual(fs.readdirSync(directory),[]);
@@ -142,7 +142,7 @@ test('cached journal cannot bypass evidence validation or changed reference/inve
  const issue=setup(t);const reconciliation=await issue();const {journal,directory}=temporaryJournal(t);
  fs.writeFileSync(journal,JSON.stringify({scope:'old-scope',assets:{}}));
  await assert.rejects(run({reconciliation:JSON.parse(JSON.stringify(reconciliation)),execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/RECONCILIATION_EVIDENCE_NOT_ISSUED/);
- await assert.rejects(run({reconciliation,execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/Journal scope mismatch/);
+ await assert.rejects(run({reconciliation,execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/MIGRATION_JOURNAL/);
  assert.deepEqual(fs.readdirSync(directory),['journal.json']);
 });
 test('mocked staging copy retries and resumes with fresh evidence; checksum mismatches remain failures',async t=>{
@@ -199,7 +199,7 @@ test('changed inventory or references invalidate the resume journal even with fr
  await run({reconciliation:original,execute:true,journal,executionArgs:executionArgs(journal),...quiet});
  // Add an unreferenced inventory entry without changing the referenced asset itself.
  const nextIssue=setup(t,{inventory:[asset,{...asset,asset_id:'unused',public_id:'unused'}],referenced:[asset]});
- await assert.rejects(run({reconciliation:await nextIssue(),execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/Journal scope mismatch/);
+ await assert.rejects(run({reconciliation:await nextIssue(),execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/MIGRATION_JOURNAL/);
 });
 test('production confirmation is rejected by staging runtime rather than changing its identity',async t=>{
  const reconciliation=await setup(t)();const {journal}=temporaryJournal(t);
@@ -208,4 +208,63 @@ test('production confirmation is rejected by staging runtime rather than changin
 test('future-dated issued evidence is rejected on clock rollback',async t=>{
  const reconciliation=await setup(t)();const now=Date.now();t.mock.method(Date,'now',()=>now-60000);
  await assert.rejects(run({reconciliation,...quiet}),/RECONCILIATION_STALE_OR_INVALID/);
+});
+test('legacy 21 referenced assets plus 19 external links plan safely without changing upload prefix',async t=>{
+ const inventory=Array.from({length:21},(_,i)=>({...asset,asset_id:`legacy-${i}`,public_id:`earn-task-platform/${i%2?'videos':'images'}/item-${i}`,secure_url:`https://res.cloudinary.com/test/image/upload/v1/earn-task-platform/${i%2?'videos':'images'}/item-${i}.png`}));
+ const unrelated=['samples','course_images','course_videos','skillforge_uploads','user_avatars'].map((root,i)=>({...asset,asset_id:`unrelated-${i}`,public_id:`${root}/file`}));
+ const issue=setup(t,{inventory:[...inventory,...unrelated],referenced:inventory,prefix:'earn-task-platform/staging'});
+ const originalDb=MongoClient.prototype.db;
+ t.mock.method(MongoClient.prototype,'db',function(){const db=originalDb.call(this);const originalCollection=db.collection;db.collection=()=>{const c=originalCollection();const find=c.find;c.find=async function*(){yield* find();for(let i=0;i<19;i++)yield {_id:(100+i).toString(16).padStart(24,'0'),avatar:'https://example.invalid/external-'+i};};return c;};return db;});
+ process.env.MEDIA_MIGRATION_SOURCE_PREFIXES='earn-task-platform/images,earn-task-platform/videos';
+ const r=await run({reconciliation:await issue(),executionArgs:['--dry-run'],...quiet});
+ assert.equal(r.eligible,21);assert.equal(r.externalOrLocalReferences,19);assert.equal(r.unreferencedAssets,5);assert.equal(r.status,'DRY_RUN_READY');assert.deepEqual(r.writes,{mongodb:0,r2:0,cloudinary:0});
+ assert.equal(process.env.CLOUDINARY_FOLDER_PREFIX,'earn-task-platform/staging');
+ assert.throws(()=>options(executionArgs('unused'),process.env),/MIGRATION_SOURCE_CONFIRMATION_REQUIRED/);
+ process.env.MEDIA_MIGRATION_SOURCE_PREFIXES_CONFIRM=process.env.MEDIA_MIGRATION_SOURCE_PREFIXES;
+ assert.equal(options(executionArgs('unused'),process.env).execute,true);
+});
+test('explicit scope cannot authorize unrelated roots, traversal, ambiguous prefixes or production',async t=>{
+ const issue=setup(t,{prefix:'earn-task-platform/staging'});
+ for(const scope of ['samples','course_images/items','course_videos/items','skillforge_uploads/items','user_avatars/items','earn-task-platform','earn-task-platform/images,earn-task-platform/images','earn-task-platform/images/../videos']){
+  process.env.MEDIA_MIGRATION_SOURCE_PREFIXES=scope;await assert.rejects(issue(),/MIGRATION_SOURCE_SCOPE_INVALID/);
+ }
+ process.env.MEDIA_MIGRATION_SOURCE_PREFIXES='earn-task-platform/images';process.env.NODE_ENV='production';await assert.rejects(issue(),/MIGRATION_SOURCE_SCOPE_INVALID/);
+});
+test('safe diagnostics report actual scope error without echoing credentials or arbitrary messages',()=>{
+ assert.equal(diagnostic(Error('SOURCE_OUTSIDE_RECONCILED_SCOPE')).blockReason,'CLOUDINARY_SOURCE_SCOPE');
+ assert.equal(diagnostic(Object.assign(Error('secret'),{safeCode:'CLOUDINARY_METADATA_REQUEST_FAILED',httpStatus:401})).blockReason,'CLOUDINARY_ACCESS');
+ assert.equal(diagnostic(Error('MIGRATION_JOURNAL')).blockReason,'MIGRATION_JOURNAL');
+ assert.ok(!JSON.stringify(diagnostic(Error('mongodb://user:secret@host/db'))).includes('secret'));
+});
+test('bucket access is checked even for zero-reference dry-run and fails closed',async t=>{
+ const issue=setup(t,{referenced:[]});t.mock.method(R2Provider.prototype,'send',async()=>{throw Error('credential-bearing provider details');});
+ await assert.rejects(run({reconciliation:await issue(),...quiet}),e=>diagnostic(e).blockReason==='R2_ACCESS');
+});
+test('dry-run inspects supplied journals without modifying them or creating lock files',async t=>{
+ const issue=setup(t);const {journal,directory}=temporaryJournal(t);fs.writeFileSync(journal,'malformed');
+ await assert.rejects(run({reconciliation:await issue(),journal,executionArgs:['--dry-run','--journal',journal],...quiet}),/MIGRATION_JOURNAL/);
+ assert.equal(fs.readFileSync(journal,'utf8'),'malformed');assert.deepEqual(fs.readdirSync(directory),['journal.json']);
+});
+test('missing confirmed Cloudinary source blocks migration, while API denial is not mistaken for missing',async t=>{
+ const issue=setup(t,{inventory:[],referenced:[asset]});const r=await issue();assert.equal(r.missingCloudinarySources,1);
+ await assert.rejects(run({reconciliation:r,...quiet}),/RECONCILIATION_REVIEW_REQUIRED/);
+});
+test('normal staging dry-run derives only referenced legacy image/video trees, without authorizing execute',async t=>{
+ const inventory=Array.from({length:21},(_,i)=>{const type=i===20?'video':'image',folder=i===20?'videos':'images';return {...asset,asset_id:`auto-${i}`,resource_type:type,public_id:`earn-task-platform/${folder}/item-${i}`,secure_url:`https://res.cloudinary.com/test/${type}/upload/v1/earn-task-platform/${folder}/item-${i}.${i===20?'mp4':'png'}`};});
+ const issue=setup(t,{inventory:[...inventory,{...asset,asset_id:'unused',public_id:'samples/image'}],referenced:inventory,prefix:'earn-task-platform/staging'});
+ const r=await run({reconciliation:await issue(),executionArgs:['--dry-run'],...quiet});
+ assert.deepEqual(r.sourcePrefixes,['earn-task-platform/images','earn-task-platform/videos']);assert.equal(r.sourceScopeMode,'REFERENCED_ASSETS');assert.equal(r.eligible,21);assert.equal(r.eligibleImages,20);assert.equal(r.eligibleVideos,1);assert.equal(r.unreferencedAssets,1);assert.deepEqual(r.writes,{mongodb:0,r2:0,cloudinary:0});
+ assert.equal(process.env.MEDIA_MIGRATION_SOURCE_PREFIXES,undefined);assert.equal(process.env.CLOUDINARY_FOLDER_PREFIX,'earn-task-platform/staging');
+ const {journal,directory}=temporaryJournal(t);
+ await assert.rejects(run({reconciliation:await issue(),execute:true,journal,executionArgs:executionArgs(journal),...quiet}),/MIGRATION_SOURCE_CONFIRMATION_REQUIRED/);
+ assert.deepEqual(fs.readdirSync(directory),[]);
+});
+for(const prefix of ['samples','course_images','course_videos','skillforge_uploads','user_avatars','earn-task-platform/production','earn-task-platform/images/production'])test(`automatic scope refuses referenced ${prefix}`,async t=>{
+ const item={...asset,public_id:prefix+'/file',secure_url:`https://res.cloudinary.com/test/image/upload/v1/${prefix}/file.png`};
+ const issue=setup(t,{inventory:[item],prefix:'earn-task-platform/staging'});await assert.rejects(issue(),/SOURCE_OUTSIDE_RECONCILED_SCOPE/);
+});
+test('explicit source scope is not widened by automatic derivation',async t=>{
+ const item={...asset,public_id:'earn-task-platform/images/image',secure_url:'https://res.cloudinary.com/test/image/upload/v1/earn-task-platform/images/image.png'};
+ const issue=setup(t,{inventory:[item],prefix:'earn-task-platform/staging'});process.env.MEDIA_MIGRATION_SOURCE_PREFIXES='earn-task-platform/videos';
+ await assert.rejects(run({reconciliation:await issue(),...quiet}),/SOURCE_OUTSIDE_RECONCILED_SCOPE/);
 });

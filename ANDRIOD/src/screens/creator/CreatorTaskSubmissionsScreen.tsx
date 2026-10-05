@@ -11,10 +11,12 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { creatorService } from '@services/creatorService';
 import { formatCoins, formatDate } from '@utils/validation';
-import { ROUTES, API_BASE_URL } from '@constants';
+import { ROUTES } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
 
 interface TaskSubmission {
   id: string;
@@ -42,6 +44,7 @@ interface TaskSubmission {
 
 const CreatorTaskSubmissionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,16 +103,6 @@ const CreatorTaskSubmissionsScreen: React.FC = () => {
     }
   };
 
-  const getProofImageUrl = (imagePath: string) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    // Handle relative paths
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
-  };
-
   const renderSubmissionCard = ({ item }: { item: TaskSubmission }) => (
     <TouchableOpacity
       style={styles.card}
@@ -151,10 +144,10 @@ const CreatorTaskSubmissionsScreen: React.FC = () => {
         </Text>
       </View>
 
-      {getProofImageUrl(item.proofImage) && (
+      {Boolean(item.proofImage) && (
         <View style={styles.proofPreview}>
           <Image
-            source={{ uri: getProofImageUrl(item.proofImage)! }}
+            source={getAuthenticatedMediaSource(item.proofImage, token) || { uri: '' }}
             style={styles.proofThumbnail}
             resizeMode="cover"
             onError={(error) => {

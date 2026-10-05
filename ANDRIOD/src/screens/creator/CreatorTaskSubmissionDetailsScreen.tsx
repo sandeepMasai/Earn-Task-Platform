@@ -17,6 +17,9 @@ import { API_BASE_URL } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
 
 interface TaskSubmission {
   id: string;
@@ -51,6 +54,7 @@ interface TaskSubmission {
 const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const submissionId = route.params?.submissionId;
 
   const [submission, setSubmission] = useState<TaskSubmission | null>(null);
@@ -264,13 +268,10 @@ const CreatorTaskSubmissionDetailsScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Proof Screenshot</Text>
             <View style={styles.proofContainer}>
-              <Image
-                source={{ uri: getProofImageUrl(submission.proofImage)! }}
+              <AuthenticatedImage
+                source={submission.proofImage}
                 style={styles.proofImage}
                 resizeMode="contain"
-                onError={(error) => {
-                  console.log('Image load error:', error);
-                }}
               />
             </View>
           </View>

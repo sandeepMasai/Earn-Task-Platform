@@ -10,7 +10,7 @@ module.exports = field => async (req, res, next) => {
     if (!media) throw fail(404, 'Media not found');
     if (String(media.user) !== String(req.user._id)) throw fail(403, 'Media belongs to another user');
     if (media.status !== 'ready') throw fail(409, 'Media is not ready');
-    if (field === 'avatar' && !media.mimeType.startsWith('image/')) throw fail(400, 'An image is required');
+    if (['avatar', 'proof', 'proofImage', 'paymentProof'].includes(field) && !media.mimeType.startsWith('image/')) throw fail(400, 'An image is required');
     if (field === 'story' && !/^(image|video)\//.test(media.mimeType)) throw fail(400, 'An image or video is required');
     if (field === 'story' && req.body.type && req.body.type !== media.mimeType.split('/')[0]) throw fail(400, 'Story type does not match media');
     const expected = media.category === 'reels' ? 'reel' : media.type;

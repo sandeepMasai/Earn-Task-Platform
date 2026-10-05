@@ -6,6 +6,7 @@ router.use(protect);
 router.use((req, res, next) => { req.mediaRequestId = randomUUID(); res.set('X-Request-ID', req.mediaRequestId); res.set('Cache-Control', 'no-store'); next(); });
 router.post('/upload/init', controller.init);
 router.post('/:id/complete', controller.complete);
+router.get('/:id/url', controller.getUrl);
 router.get('/:id/download', controller.download);
 router.get('/:id/content', controller.content);
 router.get('/:id', controller.metadata);

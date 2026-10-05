@@ -18,6 +18,13 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    tokenVersion: { type: Number, default: 0, select: false },
+    resetCodeHash: { type: String, select: false },
+    resetCodeExpiresAt: { type: Date, select: false },
+    resetCodeAttempts: { type: Number, select: false },
+    resetCodeRequestedAt: { type: Date, select: false },
+    resetTokenHash: { type: String, select: false },
+    resetTokenExpiresAt: { type: Date, select: false },
     name: {
       type: String,
       required: [true, 'Name is required'],

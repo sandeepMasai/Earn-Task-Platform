@@ -12,6 +12,8 @@ const { MongoClient } = require('mongodb');
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'isolated-test-access-secret';
 process.env.JWT_REFRESH_SECRET = 'isolated-test-refresh-secret';
+process.env.RESEND_API_KEY = 'isolated-test-resend-key';
+process.env.PASSWORD_RESET_FROM = 'Earn Task <test@example.com>';
 for (const key of ['MONGODB_URI', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) delete process.env[key];
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'earn-api-test-'));
 process.env.UPLOAD_DIR = path.join(directory, 'uploads');
@@ -97,6 +99,22 @@ test('health, auth, token separation, blocking and validation', async () => {
   status(await request('PUT', '/api/auth/instagram-id', user.token, { instagramId: 'tester' }), 200);
   status(await request('GET', `/api/auth/user/${other.id}`, user.token), 200);
   status(await request('PUT', '/api/auth/change-password', other.token, { oldPassword: 'TestPass123!', newPassword: 'Changed123!' }), 200);
+  const resetUser = await account('resetuser');
+  const mail = require('../src/services/passwordResetEmail');
+  let interceptedCode;
+  const originalSend = mail.sendResetCode;
+  mail.sendResetCode = async (email, code) => { interceptedCode = code; };
+  try {
+    status(await request('POST', '/api/auth/forgot-password', null, { email: 'resetuser@example.com' }), 200);
+    assert.ok(interceptedCode && /^\d{6}$/.test(interceptedCode));
+    const verifyRes = await request('POST', '/api/auth/verify-otp', null, { email: 'resetuser@example.com', code: interceptedCode });
+    assert.equal(verifyRes.status, 200);
+    assert.ok(verifyRes.body.resetToken);
+    const resetRes = await request('POST', '/api/auth/reset-password', null, { email: 'resetuser@example.com', resetToken: verifyRes.body.resetToken, newPassword: 'ChangedPass123!' });
+    assert.equal(resetRes.status, 200);
+  } finally {
+    mail.sendResetCode = originalSend;
+  }
   status(await request('POST', '/api/auth/logout', user.token), 200);
   status(await request('GET', '/api/posts/feed?page=-1', user.token), 400);
   status(await request('GET', '/api/tasks/not-an-id', user.token), 400);
@@ -106,7 +124,7 @@ test('health, auth, token separation, blocking and validation', async () => {
 test('all protected routes reject missing tokens; ordinary users cannot access admin APIs', async () => {
   const app = require('../src/server');
   const mounts = { authRoutes: '/api/auth', taskRoutes: '/api/tasks', walletRoutes: '/api/wallet', postRoutes: '/api/posts', referralRoutes: '/api/referrals', adminRoutes: '/api/admin', adminTaskRoutes: '/api/admin/tasks', creatorRoutes: '/api/creator', storyRoutes: '/api/stories', followRoutes: '/api/follow', mediaRoutes: '/api/media' };
-  const publicPaths = new Set(['/api/auth/signup', '/api/auth/login', '/api/auth/refresh', '/api/referrals/check/:code', '/api/wallet/withdrawal-settings']);
+  const publicPaths = new Set(['/api/auth/signup', '/api/auth/login', '/api/auth/refresh', '/api/auth/forgot-password', '/api/auth/verify-otp', '/api/auth/reset-password', '/api/referrals/check/:code', '/api/wallet/withdrawal-settings']);
   let count = 0;
   for (const [file, prefix] of Object.entries(mounts)) {
     const router = require('../src/routes/' + file);
@@ -213,8 +231,9 @@ test('posts, comments, likes, follows, stories, referrals and settings', async (
   status(await request('POST', `/api/posts/${post.id}/unlike`, other.token, {}), 200);
   status(await request('POST', `/api/posts/${post.id}/like`, other.token, {}), 200);
   assert.equal((await User.findById(other.id)).coins, before + 5);
-  status(await request('POST', `/api/posts/${post.id}/comments`, other.token, { text: 'Hello' }), 200);
+  const comment = status(await request('POST', `/api/posts/${post.id}/comments`, other.token, { text: 'Hello' }), 200);
   status(await request('GET', `/api/posts/${post.id}/comments`, user.token), 200);
+  status(await request('DELETE', `/api/posts/${post.id}/comments/${comment.id}`, other.token), 200);
   status(await request('POST', `/api/follow/${user.id}`, other.token, {}), 200);
   status(await request('GET', `/api/follow/${user.id}`, other.token), 200);
   status(await request('DELETE', `/api/follow/${user.id}`, other.token), 200);
@@ -383,14 +402,18 @@ test('direct media APIs enforce authorization, content, expiry and lifecycle', a
     const init = status(await request('POST', '/api/media/upload/init', user.token, body), 201);
     const id = init.media.id;
     assert.ok(!(await Media.findById(id)).storageKey.includes(user.id));
-    for (const [method, route] of [['GET', `/api/media/${id}`], ['GET', `/api/media/${id}/download`], ['GET', `/api/media/${id}/content`], ['DELETE', `/api/media/${id}`], ['POST', `/api/media/${id}/complete`]]) status(await request(method, route, other.token, method === 'POST' ? {} : undefined), 403);
+    for (const [method, route] of [['GET', `/api/media/${id}`], ['GET', `/api/media/${id}/download`], ['GET', `/api/media/${id}/url`], ['GET', `/api/media/${id}/content`], ['DELETE', `/api/media/${id}`], ['POST', `/api/media/${id}/complete`]]) status(await request(method, route, other.token, method === 'POST' ? {} : undefined), 403);
     status(await request('PATCH', `/api/media/${id}`, other.token, { size: 1 }), 404);
     assert.equal(deleted, 0);
     status(await request('GET', `/api/media/${id}/download`, user.token), 409);
+    status(await request('GET', `/api/media/${id}/url`, user.token), 409);
     status(await request('GET', `/api/media/${id}`, user.token), 200);
     status(await request('POST', `/api/media/${id}/complete`, user.token, {}), 200);
     status(await request('POST', `/api/media/${id}/complete`, user.token, {}), 200);
     status(await request('GET', `/api/media/${id}/download`, user.token), 200);
+    const urlRes = status(await request('GET', `/api/media/${id}/url`, user.token), 200);
+    assert.ok(urlRes.url);
+    outcomes.push({ method: 'GET', route: `/api/media/${id}/url`, status: 200 });
     const content = await fetch(base + `/api/media/${id}/content`, { headers: { Authorization: `Bearer ${user.token}` }, redirect: 'manual' });
     assert.equal(content.status, 302); assert.equal(content.headers.get('Location'), 'https://storage.invalid/download');
     outcomes.push({ method: 'GET', route: `/api/media/${id}/content`, status: content.status });
@@ -399,6 +422,8 @@ test('direct media APIs enforce authorization, content, expiry and lifecycle', a
     assert.equal(attachedPost.imageUrl, `/api/media/${id}/content`);
     const published = await fetch(base + `/api/media/${id}/content`, { headers: { Authorization: `Bearer ${other.token}` }, redirect: 'manual' });
     assert.equal(published.status, 302);
+    const publishedUrl = status(await request('GET', `/api/media/${id}/url`, other.token), 200);
+    assert.ok(publishedUrl.url);
     status(await request('GET', `/api/media/${id}/download`, other.token), 403);
     const attachedProfile = status(await request('PUT', '/api/auth/profile', user.token, { mediaId: id }), 200);
     assert.equal(attachedProfile.user.avatar, `/api/media/${id}/content`);

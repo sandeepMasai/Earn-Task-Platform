@@ -1,15 +1,7 @@
 import { apiService } from './api';
+import { mediaService } from './mediaService';
 import { StoryGroup, Story } from '@types';
-import { API_BASE_URL } from '@constants';
-
-// Helper to get full media URL
-const getMediaUrl = (url: string): string => {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  const baseUrl = API_BASE_URL.replace('/api', '');
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${baseUrl}${path}`;
-};
+import { resolveMediaUrl } from '@utils/mediaUrl';
 
 export const storyService = {
   async getStories(): Promise<StoryGroup[]> {
@@ -19,8 +11,8 @@ export const storyService = {
       ...group,
       stories: group.stories.map((story: Story) => ({
         ...story,
-        mediaUrl: getMediaUrl(story.mediaUrl),
-        thumbnailUrl: story.thumbnailUrl ? getMediaUrl(story.thumbnailUrl) : undefined,
+        mediaUrl: resolveMediaUrl(story.mediaUrl),
+        thumbnailUrl: story.thumbnailUrl ? resolveMediaUrl(story.thumbnailUrl) : undefined,
       })),
     }));
   },
@@ -30,6 +22,27 @@ export const storyService = {
     type: 'image' | 'video',
     videoDuration?: number
   ): Promise<Story> {
+    try {
+      const category = type === 'video' ? 'videos' : 'images';
+      const { mediaId } = await mediaService.uploadMedia({
+        uri: mediaUri,
+        category,
+      });
+      const response = await apiService.post<Story>('/stories', {
+        mediaId,
+        type,
+      });
+      const story = (response as any).data ?? response;
+      return {
+        ...story,
+        id: story._id || story.id,
+        mediaUrl: resolveMediaUrl(story.mediaUrl),
+        thumbnailUrl: story.thumbnailUrl ? resolveMediaUrl(story.thumbnailUrl) : undefined,
+      };
+    } catch {
+      // Fall back to multipart if direct upload fails
+    }
+
     const formData = new FormData();
     formData.append('media', {
       uri: mediaUri,
@@ -50,8 +63,8 @@ export const storyService = {
     return {
       ...story,
       id: story._id || story.id,
-      mediaUrl: getMediaUrl(story.mediaUrl),
-      thumbnailUrl: story.thumbnailUrl ? getMediaUrl(story.thumbnailUrl) : undefined,
+      mediaUrl: resolveMediaUrl(story.mediaUrl),
+      thumbnailUrl: story.thumbnailUrl ? resolveMediaUrl(story.thumbnailUrl) : undefined,
     };
   },
 

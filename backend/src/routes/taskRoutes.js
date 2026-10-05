@@ -19,7 +19,7 @@ router.post('/:id/watch/heartbeat', protect, require('../controllers/watchContro
 router.get('/', protect, getTasks);
 router.get('/:id', protect, getTaskById);
 router.post('/:id/complete', protect, completeTask);
-router.post('/:id/submit-proof', protect, upload.single('proofImage'), submitTaskProof);
+router.post('/:id/submit-proof', protect, upload.single('proofImage'), require('../middleware/mediaReference')('proofImage'), submitTaskProof);
 router.post('/verify/instagram-follow', protect, verifyInstagramFollow);
 router.post('/verify/youtube-subscribe', protect, verifyYouTubeSubscribe);
 

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, AppState } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { useAppDispatch } from '@store/hooks';
+import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { completeTask, fetchTaskById } from '@store/slices/taskSlice';
 import { addCoins } from '@store/slices/walletSlice';
 import { addUserReward } from '@store/slices/authSlice';
@@ -13,6 +13,7 @@ import { Completion } from '@services/completion';
 import type { RootStackParamList } from '@types';
 import type { WatchSession } from '@services/watchTypes';
 import { VIDEO_WATCH_PERCENTAGE } from '@constants';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
 import Button from '@components/common/Button';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 const VideoPlayerScreen: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'VideoPlayer'>>();
   const dispatch = useAppDispatch();
+  const token = useAppSelector((state) => state.auth.token);
   const { task } = route.params;
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -156,7 +158,7 @@ const VideoPlayerScreen: React.FC = () => {
         ) : task.videoUrl ? (
           <Video
             ref={videoRef}
-            source={{ uri: task.videoUrl }}
+            source={getAuthenticatedMediaSource(task.videoUrl, token) || { uri: '' }}
             style={styles.video}
             resizeMode={ResizeMode.CONTAIN}
             shouldPlay={false}

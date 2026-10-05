@@ -10,6 +10,8 @@ import { ROUTES } from '@constants';
 import SplashScreen from '@screens/auth/SplashScreen';
 import OnboardingScreen from '@screens/auth/OnboardingScreen';
 import LoginScreen from '@screens/auth/LoginScreen';
+import ForgotPasswordScreen from '@screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '@screens/auth/ResetPasswordScreen';
 import SignupScreen from '@screens/auth/SignupScreen';
 import InstagramIdScreen from '@screens/auth/InstagramIdScreen';
 
@@ -90,6 +92,8 @@ const AppNavigator: React.FC = () => {
                 {/* Always register auth screens to prevent navigation errors */}
                 <Stack.Screen name={ROUTES.ONBOARDING} component={OnboardingScreen} />
                 <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
+                <Stack.Screen name={ROUTES.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
+                <Stack.Screen name={ROUTES.RESET_PASSWORD} component={ResetPasswordScreen} />
                 <Stack.Screen name={ROUTES.SIGNUP} component={SignupScreen} />
                 <Stack.Screen name={ROUTES.INSTAGRAM_ID} component={InstagramIdScreen} />
                 {isAuthenticated && (

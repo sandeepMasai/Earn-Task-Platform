@@ -20,8 +20,15 @@ export const store = configureStore({
     }),
 });
 
+import { setMediaAuthToken } from '../utils/mediaUrl';
+
 apiService.auth.onLogout = () => { store.dispatch(clearAuth()); };
 apiService.auth.onRefresh = data => { store.dispatch(accessRefreshed(data)); };
+
+store.subscribe(() => {
+  const token = store.getState()?.auth?.token;
+  setMediaAuthToken(token || null);
+});
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

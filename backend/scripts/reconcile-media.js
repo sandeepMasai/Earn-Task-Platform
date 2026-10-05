@@ -6,7 +6,7 @@ const {randomUUID}=require('node:crypto');
 const path=require('node:path');
 const {MongoClient}=require('mongodb');
 const {definitions,extract,reconcile}=require('../src/services/reconciliation-media');
-const {targetIdentity,fingerprint,inventoryFingerprint,assertFresh,freeze}=require('../src/services/reconciliation-media/migration-safety');
+const {resolvedSourcePrefixes,targetIdentity,fingerprint,inventoryFingerprint,assertFresh,freeze}=require('../src/services/reconciliation-media/migration-safety');
 // Only collect() can issue migration evidence. JSON reports and cached journals cannot mint it.
 const issuedEvidence=new WeakMap();
 function verifyEvidence(result,env){
@@ -63,7 +63,7 @@ async function collect(env,{forMigration=false}={}){
     if(forMigration){
       if(result.databaseName!==target.databaseName||result.environment!==target.environment||fingerprint(targetIdentity(env))!==fingerprint(target))throw safeFailure('RECONCILIATION_TARGET_MISMATCH');
       assertFresh(generatedAt);
-      result.migrationBinding={version:1,generation:randomUUID(),targetFingerprint:fingerprint(target),inventoryFingerprint:inventoryFingerprint(inventory),referencesFingerprint:fingerprint(result.references)};
+      result.migrationBinding={sourcePrefixes:resolvedSourcePrefixes(env,result,inventory),sourceScopeMode:env.MEDIA_MIGRATION_SOURCE_PREFIXES===undefined?'REFERENCED_ASSETS':'EXPLICIT',version:1,generation:randomUUID(),targetFingerprint:fingerprint(target),inventoryFingerprint:inventoryFingerprint(inventory),referencesFingerprint:fingerprint(result.references)};
       freeze(result);freeze(inventory);freeze(target);
       issuedEvidence.set(result,Object.freeze({target,inventory,targetFingerprint:fingerprint(target),reportFingerprint:fingerprint(result),inventoryFingerprint:inventoryFingerprint(inventory)}));
     }

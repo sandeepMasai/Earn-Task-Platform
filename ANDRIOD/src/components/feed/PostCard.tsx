@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import Toast from 'react-native-toast-message';
 import { useAppSelector } from '@store/hooks';
 import { ROUTES } from '../../constants/index';
+import { useAvatarUrl, useMediaUrl, getAuthenticatedMediaSource } from '@utils/mediaUrl';
 
 interface PostCardProps {
   post: Post;
@@ -34,7 +35,10 @@ const PostCard: React.FC<PostCardProps> = ({
   shouldPlay = true,
 }) => {
   const navigation = useNavigation<any>();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
+  const { url: avatarUrl, reload: reloadAvatar } = useAvatarUrl(post.userAvatar);
+  const { url: postImageUrl } = useMediaUrl(post.type === 'image' ? post.imageUrl : null);
+  const { url: postVideoUrl } = useMediaUrl(post.type === 'video' ? post.videoUrl : null);
   // Compare IDs as strings to handle both string and ObjectId formats
   // Also check if user exists and post has userId
   const isOwnPost = user?.id && post.userId && user.id.toString() === post.userId.toString();
@@ -45,8 +49,14 @@ const PostCard: React.FC<PostCardProps> = ({
   const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showPlayIcon, setShowPlayIcon] = useState(false); // Hide play icon initially
 
-  const player = post.videoUrl
-    ? useVideoPlayer(post.videoUrl, (player) => {
+  const videoSource = React.useMemo(() => {
+    const raw = postVideoUrl || post.videoUrl;
+    if (!raw) return null;
+    return getAuthenticatedMediaSource(raw, token);
+  }, [postVideoUrl, post.videoUrl, token]);
+
+  const player = videoSource
+    ? useVideoPlayer(videoSource, (player) => {
       player.loop = true;
       player.muted = true; // Start muted
       // Don't play immediately - let the visibility effect handle it
@@ -340,8 +350,12 @@ const PostCard: React.FC<PostCardProps> = ({
             }
           }}
         >
-          {post.userAvatar ? (
-            <Image source={{ uri: post.userAvatar }} style={styles.avatar} />
+          {avatarUrl || post.userAvatar ? (
+            <Image
+              source={getAuthenticatedMediaSource(avatarUrl || post.userAvatar, token) || { uri: '' }}
+              style={styles.avatar}
+              onError={() => reloadAvatar()}
+            />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Ionicons name="person" size={20} color="#8E8E93" />
@@ -406,7 +420,7 @@ const PostCard: React.FC<PostCardProps> = ({
       {/* Media Display */}
       {post.type === 'image' && post.imageUrl ? (
         <Image
-          source={{ uri: post.imageUrl }}
+          source={getAuthenticatedMediaSource(postImageUrl || post.imageUrl, token) || { uri: '' }}
           style={styles.media}
           resizeMode="cover"
           onError={(e) => {

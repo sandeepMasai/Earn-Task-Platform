@@ -535,3 +535,33 @@ exports.deletePost = async (req, res) => {
     return errorResponse(res, error);
   }
 };
+
+// @desc    Delete comment
+// @route   DELETE /api/posts/:id/comments/:commentId
+// @access  Private
+exports.deleteComment = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ success: false, error: 'Comment not found' });
+    }
+
+    // Only comment author or post owner can delete
+    if (comment.user.toString() !== req.user._id.toString() && post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this comment' });
+    }
+
+    post.comments.pull({ _id: req.params.commentId });
+    await post.save();
+
+    res.json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error) {
+    return errorResponse(res, error);
+  }
+};
+

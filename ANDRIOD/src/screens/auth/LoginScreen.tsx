@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Pressable, Text } from 'react-native';
+import AuthLayout, { authStyles } from '@components/auth/AuthLayout';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch } from '@store/hooks';
 import { loginUser } from '@store/slices/authSlice';
 import { validation } from '@utils/validation';
 import { ERROR_MESSAGES, ROUTES } from '@constants';
 import Button from '@components/common/Button';
-import Input from '@components/common/Input';
+import Input from '@components/auth/AuthInput';
 import Toast from 'react-native-toast-message';
 
 const LoginScreen: React.FC = () => {
@@ -37,13 +38,11 @@ const LoginScreen: React.FC = () => {
     };
 
     const handleLogin = async () => {
-        if (!validate()) return;
+        if (loading || !validate()) return;
 
         setLoading(true);
         try {
-            console.log('🔐 Login attempt started');
-            const result = await dispatch(loginUser({ email, password })).unwrap();
-            console.log('✅ Login successful:', result);
+            await dispatch(loginUser({ email, password })).unwrap();
             Toast.show({
                 type: 'success',
                 text1: 'Success',
@@ -51,7 +50,6 @@ const LoginScreen: React.FC = () => {
             });
             navigation.replace('MainTabs');
         } catch (error: any) {
-            console.error('❌ Login failed:', error);
             const errorMessage = error || ERROR_MESSAGES.INVALID_CREDENTIALS;
             Toast.show({
                 type: 'error',
@@ -65,103 +63,16 @@ const LoginScreen: React.FC = () => {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Welcome Back</Text>
-                    <Text style={styles.subtitle}>Sign in to continue</Text>
-                </View>
-
-                <View style={styles.form}>
-                    <Input
-                        label="Email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        error={errors.email}
-                    />
-
-                    <Input
-                        label="Password"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        error={errors.password}
-                    />
-
-                    <Button
-                        title="Sign In"
-                        onPress={handleLogin}
-                        loading={loading}
-                        style={styles.loginButton}
-                    />
-
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>Don't have an account? </Text>
-                        <Text
-                            style={styles.link}
-                            onPress={() => navigation.navigate(ROUTES.SIGNUP)}
-                        >
-                            Sign Up
-                        </Text>
-                    </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+        <AuthLayout title="Welcome back" subtitle="Log in to pick up where you left off." loading={loading} onSwitch={() => navigation.navigate(ROUTES.SIGNUP)}>
+            <Input label="Email address" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" error={errors.email} editable={!loading} />
+            <Input label="Password" placeholder="Enter your password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="current-password" error={errors.password} editable={!loading} returnKeyType="go" onSubmitEditing={handleLogin} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Forgot password" disabled={loading} onPress={() => navigation.navigate(ROUTES.FORGOT_PASSWORD)} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-end', paddingHorizontal: 8 }}>
+                <Text style={{ color: '#176B54', fontWeight: '700', fontSize: 14 }}>Forgot password?</Text>
+            </Pressable>
+            <Button title="Log in" onPress={handleLogin} loading={loading} style={authStyles.submit} />
+        </AuthLayout>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
-    scrollContent: {
-        flexGrow: 1,
-        padding: 20,
-        justifyContent: 'center',
-    },
-    header: {
-        marginBottom: 40,
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#000000',
-        marginBottom: 8,
-        marginTop: 20,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#8E8E93',
-    },
-    form: {
-        width: '100%',
-    },
-    loginButton: {
-        marginTop: 8,
-    },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 24,
-    },
-    footerText: {
-        fontSize: 14,
-        color: '#8E8E93',
-    },
-    link: {
-        fontSize: 14,
-        color: '#007AFF',
-        fontWeight: '600',
-    },
-});
 
 export default LoginScreen;
 

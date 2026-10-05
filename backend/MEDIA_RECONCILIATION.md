@@ -38,3 +38,26 @@ Evidence is single-use, expires five minutes after collection starts, and is che
 - `npm test`: the complete backend suite. Node's default test-file process isolation confines the media guard to those test files. Ordinary API tests retain the existing disposable MongoDB harness: temporary data directory, loopback-only random port, and `earn_isolated_test` database, with teardown. They never use the application's configured MongoDB URI. No production migration guard is disabled or changed by either command.
 
 Do not apply a suite-wide MongoDB-blocking preload to the ordinary API tests: it prevents their explicitly disposable database setup. The scoped media guard is loaded by the test files themselves, so it also applies when those files are run directly.
+
+## Legacy application sources in a staging dry-run
+
+`CLOUDINARY_FOLDER_PREFIX` controls new Cloudinary uploads; it does not relocate historical assets when their references are copied into a staging database. For explicit control of legacy references under the application's `earn-task-platform/images/` and `earn-task-platform/videos/` trees, keep the staging upload prefix unchanged and optionally set:
+
+```text
+MEDIA_MIGRATION_SOURCE_PREFIXES=earn-task-platform/images,earn-task-platform/videos
+```
+
+This migration-only allowlist is permitted in staging/test only. Each prefix must be the configured upload prefix (or a child), or one of the two legacy application image/video trees (or a child). Empty, duplicate, overlapping, broad root, unrelated and traversal scopes are rejected. Only reconciled referenced assets within that scope are candidates; external/local references and unreferenced inventory remain untouched. The list is bound into single-use reconciliation evidence and journal identity.
+
+Execute mode additionally requires `MEDIA_MIGRATION_SOURCE_PREFIXES_CONFIRM` to equal the comma-separated sorted allowlist exactly, alongside **all existing** execution, staging/test bucket, upload-prefix confirmation and journal safeguards. `MEDIA_MIGRATION_EXECUTE=false` remains appropriate for dry-run. Neither an allowlist nor its confirmation enables production execution. Changing the list invalidates prior evidence/journal scope.
+
+Dry-run authenticates through Cloudinary metadata reads, reads MongoDB, verifies R2 bucket access using HEAD, checks candidate destination keys, and reads/validates a journal when `--journal PATH` is supplied. It does not create a journal or lock. Without a journal it reports `NOT_SUPPLIED`; there is no implicit journal. Failures report an allowlisted `blockReason`, never raw exception messages or credentials. A scope mismatch reports `CLOUDINARY_SOURCE_SCOPE`; R2 access failure reports `R2_ACCESS`.
+
+This remains a copy-and-verify tool. It does **not** update application database references or delete Cloudinary assets in either mode. Database cutover and deletion eligibility require a separate reviewed workflow; a successful copy journal never authorizes Cloudinary deletion.
+
+
+## Automatic staging/test preview scope
+
+The normal `npm run migrate:media -- --dry-run` no longer requires a prefix override. When no explicit migration prefix list exists, reconciliation derives a preview scope from resolved DB-referenced assets only. It accepts the configured upload namespace, plus the known legacy image/video trees only when the application upload prefix is `earn-task-platform/staging` or `earn-task-platform/test` (or their subfolders). Resource type must match the legacy tree. Unreferenced inventory and external/local references cannot expand this scope. Unrelated, ambiguous, and production paths are rejected; missing sources still block planning. Production does not receive this derivation behavior.
+
+The derived prefixes and mode are sealed into reconciliation evidence and journal scope. Explicit `MEDIA_MIGRATION_SOURCE_PREFIXES` values remain authoritative and are never widened automatically. Execution of a derived legacy scope is blocked until an explicit matching prefix list and its confirmation are supplied, alongside all existing staging/test authorization gates. Production execution remains disabled. The report includes eligible image/video counts, scope validation, skipped reference counts and write counters. No `.env` change or new execution permission is needed for the preview.

@@ -59,7 +59,7 @@ const UploadPostScreen: React.FC = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -83,7 +83,7 @@ const UploadPostScreen: React.FC = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ['videos'],
       allowsEditing: true, // This enables trimming on iOS/Android
       videoMaxDuration: 120, // 2 minutes max - will auto-trim if longer
       quality: 0.8,
@@ -175,7 +175,7 @@ const UploadPostScreen: React.FC = () => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ['videos'],
       allowsEditing: true, // This enables trimming after recording
       videoMaxDuration: 120, // 2 minutes max - will stop recording at 2 minutes
       quality: 0.8,

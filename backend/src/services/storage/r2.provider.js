@@ -32,9 +32,13 @@ class R2Provider {
     finally { result.Body?.destroy?.(); }
     return Buffer.concat(chunks);
   }
-  async getUrl(asset, { expiresIn = 300 } = {}) {
+  async getUrl(asset, { expiresIn = 300, disposition = 'attachment' } = {}) {
     if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 900) throw new StorageError('INVALID_EXPIRY', 400);
-    try { return await this.signer(this.client, new GetObjectCommand({ ...this.params(asset), ResponseContentDisposition: 'attachment' }), { expiresIn }); } catch (e) { throw safeError(e); }
+    const commandParams = { ...this.params(asset) };
+    if (disposition) {
+      commandParams.ResponseContentDisposition = disposition;
+    }
+    try { return await this.signer(this.client, new GetObjectCommand(commandParams), { expiresIn }); } catch (e) { throw safeError(e); }
   }
   async presignUpload({ storageKey, mimeType, size, checksum, expiresIn = 300 }) {
     if (!Number.isSafeInteger(size) || size < 1 || size > 512 * 1024 * 1024 || !Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 900 || !/^[A-Za-z0-9+/]{43}=$/.test(checksum || '')) throw new StorageError('INVALID_UPLOAD', 400);

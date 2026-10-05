@@ -22,15 +22,17 @@ import PostCard from '@components/feed/PostCard';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Post } from '@types';
 import { ROUTES, API_BASE_URL } from '../../constants/index';
+import { useAvatarUrl, resolveMediaUrl, getAuthenticatedMediaSource } from '@utils/mediaUrl';
 
 const UserProfileScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const { user: currentUser } = useAppSelector((state) => state.auth);
+  const { user: currentUser, token } = useAppSelector((state) => state.auth);
   const { userId } = route.params;
 
   const [user, setUser] = useState<any>(null);
+  const { url: avatarUrl, reload: reloadAvatar } = useAvatarUrl(user);
   const [posts, setPosts] = useState<Post[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,15 +88,7 @@ const UserProfileScreen: React.FC = () => {
 
   // Helper to get full avatar URL
   const getAvatarUrl = (avatar: string | null | undefined): string | null => {
-    if (!avatar) return null;
-    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-      return avatar;
-    }
-    if (avatar.startsWith('/uploads/')) {
-      const baseUrl = API_BASE_URL.replace('/api', '');
-      return `${baseUrl}${avatar}`;
-    }
-    return avatar;
+    return resolveMediaUrl(avatar);
   };
 
   const handleFollow = async () => {
@@ -192,10 +186,11 @@ const UserProfileScreen: React.FC = () => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            {user?.avatar ? (
+            {avatarUrl || user?.avatar ? (
               <Image
-                source={{ uri: getAvatarUrl(user.avatar) || '' }}
+                source={getAuthenticatedMediaSource(avatarUrl || user?.avatar, token) || { uri: '' }}
                 style={styles.avatarImage}
+                onError={() => reloadAvatar()}
               />
             ) : (
               <View style={styles.avatar}>

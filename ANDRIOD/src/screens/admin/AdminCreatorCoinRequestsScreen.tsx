@@ -18,6 +18,9 @@ import { ROUTES } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
 
 interface CreatorCoinRequest {
   id: string;
@@ -45,6 +48,7 @@ const UPI_ID = 'sk245444@ybl';
 
 const AdminCreatorCoinRequestsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const [requests, setRequests] = useState<CreatorCoinRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -241,18 +245,10 @@ const AdminCreatorCoinRequestsScreen: React.FC = () => {
                 <Text style={styles.pdfHint}>Tap to open payment proof PDF</Text>
               </TouchableOpacity>
             ) : (
-              <Image
-                source={{ uri: proofUrl }}
+              <AuthenticatedImage
+                source={proofUrl}
                 style={styles.proofImage}
                 resizeMode="contain"
-                onError={(error) => {
-                  console.log('Image load error:', error);
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: 'Could not load payment proof image',
-                  });
-                }}
               />
             )}
           </View>

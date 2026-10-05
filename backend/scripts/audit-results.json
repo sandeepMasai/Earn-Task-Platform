@@ -1,0 +1,863 @@
+{
+  "total": 95,
+  "passed": 95,
+  "failed": 0,
+  "matrix": [
+    {
+      "section": "Config",
+      "feature": "NODE_ENV is staging",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Config",
+      "feature": "Staging DB separation (earn_task_platform_staging)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Config",
+      "feature": "R2 Media Storage Provider is active",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Config",
+      "feature": "R2 Bucket is private",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Config",
+      "feature": "Resend API key configured in backend only",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Health",
+      "feature": "GET /health returns 200 ok",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Health",
+      "feature": "GET /ready returns 200 connected",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Health",
+      "feature": "GET /api/health returns 200 connected",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Health",
+      "feature": "404 handler returns clean error",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Health",
+      "feature": "Security headers present (x-content-type-options: nosniff)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup rejects weak password (< 6 chars)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup rejects invalid email format",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup rejects missing required fields",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup disposable User A succeeds (201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup rejects duplicate email",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup rejects duplicate username",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Signup disposable User B succeeds (201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Login rejects wrong password with 401",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Login rejects nonexistent user with 401",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Login User A returns accessToken and refreshToken",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "Login User B returns valid credentials",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "GET /api/auth/me succeeds with valid Bearer token",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "GET /api/auth/me rejects invalid token with 401",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "POST /api/auth/refresh returns new accessToken",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Auth",
+      "feature": "PUT /api/auth/profile updates profile fields",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Forgot password does not reveal unknown email (generic message)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Forgot password request succeeds with generic message",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "OTP is HMAC-hashed in DB and never stored as plaintext",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Verify OTP rejects invalid 6-digit code with 400",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Verify OTP returns single-use resetToken",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "OTP reuse is strictly blocked (single-use code)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "POST /api/auth/reset-password succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Old password is no longer accepted after reset",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Login succeeds with new password",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "PasswordReset",
+      "feature": "Prior sessions/tokens invalidated after password reset",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "Init image/png upload returns presigned R2 URL and mediaId",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "Direct HTTP PUT of PNG to R2 succeeds (200)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "POST /api/media/:id/complete succeeds with status ready",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "Attach R2 mediaId to user avatar succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "Upload and complete image/jpeg succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Image",
+      "feature": "Upload and complete image/webp succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Video",
+      "feature": "Init video/mp4 upload returns presigned R2 URL",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Video",
+      "feature": "Direct HTTP PUT of MP4 to R2 succeeds (200)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Video",
+      "feature": "Complete video/mp4 succeeds with status ready",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Document",
+      "feature": "Init application/pdf upload returns presigned R2 URL",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Document",
+      "feature": "Complete application/pdf succeeds with status ready",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Audio",
+      "feature": "Audio upload cleanly rejected (unsupported category)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Security",
+      "feature": "GET /api/media/:id/download returns signed R2 download URL",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Security",
+      "feature": "Signed R2 download URL downloads exact matching file bytes",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Security",
+      "feature": "User B cannot download User A private media (403)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Security",
+      "feature": "Anonymous user cannot download private media (401)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Security",
+      "feature": "Tampered signed R2 URL rejected by Cloudflare R2 (403)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "MIME:Security",
+      "feature": "Server strictly rejects text file declared as image/jpeg (400)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "MIME:Security",
+      "feature": "Server strictly rejects JPEG bytes declared as image/png (400)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Create image post with R2 mediaId succeeds (201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Create video post with R2 mediaId succeeds (201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "GET /api/posts/feed returns newly created post",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "User B likes User A post succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Duplicate like is rejected / idempotent",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Add comment succeeds (200/201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Get post comments succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Delete own comment succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Unlike post succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Posts",
+      "feature": "Delete own post succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Follow",
+      "feature": "User A follows User B succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Follow",
+      "feature": "Duplicate follow rejected",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Follow",
+      "feature": "Follow stats reflect follower count increase",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Follow",
+      "feature": "Unfollow User B succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Stories",
+      "feature": "Create story with R2 mediaId succeeds (201)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Stories",
+      "feature": "GET /api/stories lists active stories",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Stories",
+      "feature": "POST /api/stories/:id/view records story view",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Admin",
+      "feature": "Admin login succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "Admin creates Instagram task requiring screenshot proof",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "User views available tasks",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "User submits task proof via direct R2 mediaId",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "Duplicate task submission rejected (400)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "Admin views task submissions list",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "Admin approves task submission",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Tasks",
+      "feature": "User wallet credited with reward coins upon approval",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Wallet",
+      "feature": "GET /api/wallet/balance returns current balance",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Wallet",
+      "feature": "GET /api/wallet/transactions returns transaction history",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Wallet",
+      "feature": "Overdraft withdrawal strictly rejected (400)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Creator",
+      "feature": "Register as creator succeeds",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Creator",
+      "feature": "Pending creator blocked from /creator/dashboard with 403",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Creator",
+      "feature": "Admin approves creator request",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Creator",
+      "feature": "GET /creator/dashboard succeeds after approval",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Creator",
+      "feature": "Creator requests coins with R2 payment proof mediaId",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Security:IDOR",
+      "feature": "Normal user blocked from /api/admin/dashboard with 403",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Security:IDOR",
+      "feature": "Normal user blocked from /api/admin/users/:id delete with 403",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Admin",
+      "feature": "Admin accesses /api/admin/dashboard stats",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Admin",
+      "feature": "Admin accesses /api/admin/users list",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Settings",
+      "feature": "GET /api/admin/coins returns coin configurations",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Settings",
+      "feature": "GET /api/wallet/withdrawal-settings returns active limits",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Delete",
+      "feature": "Delete PDF media returns 202/200",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    },
+    {
+      "section": "Media:Delete",
+      "feature": "Deleted media download rejected (404/409)",
+      "tested": true,
+      "result": "PASS",
+      "problem": "None",
+      "fix": "None",
+      "retested": "YES"
+    }
+  ],
+  "details": {}
+}

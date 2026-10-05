@@ -5,21 +5,15 @@ import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { refreshUser } from '@store/slices/authSlice';
 import { formatCoins } from '@utils/validation';
 import { ROUTES, API_BASE_URL, SUPPORT_CHANNELS } from '@constants';
+import { useAvatarUrl, resolveMediaUrl, getAuthenticatedMediaSource } from '@utils/mediaUrl';
 import { Ionicons } from '@expo/vector-icons';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
   const [refreshing, setRefreshing] = useState(false);
-  const [avatarVersion, setAvatarVersion] = useState<number>(0);
-
-  // Bump cache-buster whenever avatar changes so UI refreshes immediately
-  useEffect(() => {
-    if (user?.avatar) {
-      setAvatarVersion(Date.now());
-    }
-  }, [user?.avatar]);
+  const { url: avatarUrl, reload: reloadAvatar } = useAvatarUrl(user);
 
   // Refresh user data when screen comes into focus
   useFocusEffect(
@@ -100,16 +94,7 @@ const ProfileScreen: React.FC = () => {
 
   // Helper to get full avatar URL
   const getAvatarUrl = (avatar: string | null | undefined): string | null => {
-    if (!avatar) return null;
-    const cacheBust = avatarVersion ? `?v=${avatarVersion}` : '';
-    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-      return `${avatar}${cacheBust}`;
-    }
-    if (avatar.startsWith('/uploads/')) {
-      const baseUrl = API_BASE_URL.replace('/api', '');
-      return `${baseUrl}${avatar}${cacheBust}`;
-    }
-    return `${avatar}${cacheBust}`;
+    return resolveMediaUrl(avatar);
   };
 
   const accountMenuItems = [
@@ -207,10 +192,11 @@ const ProfileScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          {user?.avatar ? (
+          {avatarUrl || user?.avatar ? (
             <Image
-              source={{ uri: getAvatarUrl(user.avatar) || '' }}
+              source={getAuthenticatedMediaSource(avatarUrl || user?.avatar, token) || { uri: '' }}
               style={styles.avatarImage}
+              onError={() => reloadAvatar()}
             />
           ) : (
             <View style={styles.avatar}>

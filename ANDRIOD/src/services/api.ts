@@ -8,7 +8,7 @@ export class ApiError extends Error {
   constructor(message: string, public status?: number) { super(message); }
 }
 type AuthConfig = InternalAxiosRequestConfig & { _retry?: boolean; _authEpoch?: number };
-const publicAuth = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout']);
+const publicAuth = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout', '/auth/forgot-password', '/auth/verify-otp', '/auth/reset-password']);
 
 class ApiService {
   private client: AxiosInstance;
@@ -84,9 +84,9 @@ class ApiService {
   async post<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.post(url, data, config);
-      // Backend returns { success: true, data: ... }
-      if (response.data.success) {
-        return { success: true, data: response.data.data };
+      if (response.data?.success) {
+        const payloadData = response.data.data !== undefined ? response.data.data : response.data;
+        return { success: true, ...response.data, data: payloadData };
       }
       return response.data;
     } catch (error) {

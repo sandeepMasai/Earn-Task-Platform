@@ -17,11 +17,13 @@ import { postService } from '@services/postService';
 import { Post } from '@types';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDate } from '@utils/validation';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
 
 const MyPostsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,7 +94,7 @@ const MyPostsScreen: React.FC = () => {
       </View>
 
       {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.media} resizeMode="cover" />
+        <AuthenticatedImage source={item.imageUrl} style={styles.media} resizeMode="cover" fallbackIcon="image-outline" />
       ) : item.videoUrl ? (
         <View style={[styles.media, styles.videoPlaceholder]}>
           <Ionicons name="videocam-outline" size={32} color="#8E8E93" />

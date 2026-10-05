@@ -19,14 +19,17 @@ import { taskService } from '@services/taskService';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import Toast from 'react-native-toast-message';
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
 
 const TaskDetailsScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
   const { currentTask, isLoading } = useAppSelector((state) => state.tasks);
+  const token = useAppSelector((state) => state.auth.token);
   const taskId = route.params?.taskId;
 
   const [proofImage, setProofImage] = useState<string | null>(null);
@@ -128,7 +131,7 @@ const TaskDetailsScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -258,7 +261,7 @@ const TaskDetailsScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {currentTask.thumbnail && (
-        <Image source={{ uri: currentTask.thumbnail }} style={styles.thumbnail} />
+        <AuthenticatedImage source={currentTask.thumbnail} style={styles.thumbnail} />
       )}
 
       <View style={styles.details}>
@@ -316,7 +319,7 @@ const TaskDetailsScreen: React.FC = () => {
 
             {proofImage ? (
               <View style={styles.proofPreview}>
-                <Image source={{ uri: proofImage }} style={styles.proofImage} />
+                <Image source={getAuthenticatedMediaSource(proofImage, token) || { uri: '' }} style={styles.proofImage} />
                 <TouchableOpacity
                   onPress={() => setProofImage(null)}
                   style={styles.removeButton}

@@ -16,37 +16,29 @@ import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@store/hooks';
 import { refreshUser, setUser } from '@store/slices/authSlice';
 import { authService } from '@services/authService';
+import { mediaService } from '@services/mediaService';
 import { authStorage } from '@utils/storage';
+import { getAuthenticatedImageSource, useAvatarUrl } from '@utils/mediaUrl';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-import { API_BASE_URL } from '../../constants/index';
 
 const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
 
+  const { url: signedAvatarUrl, reload: reloadAvatar } = useAvatarUrl(user);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [username, setUsername] = useState(user?.username || '');
   const [avatar, setAvatar] = useState<string | null>(user?.avatar || null);
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
-
-  const getImageUrl = (imagePath: string | null | undefined): string | null => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    if (imagePath.startsWith('/uploads/')) {
-      return `${API_BASE_URL.replace('/api', '')}${imagePath}`;
-    }
-    return imagePath;
-  };
 
   const pickImage = async () => {
     try {
@@ -60,13 +52,15 @@ const EditProfileScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedImage(result.assets[0]);
         setAvatar(result.assets[0].uri);
       }
     } catch (error: any) {
@@ -93,9 +87,11 @@ const EditProfileScreen: React.FC = () => {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedImage(result.assets[0]);
         setAvatar(result.assets[0].uri);
       }
     } catch (error: any) {
@@ -181,64 +177,21 @@ const EditProfileScreen: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Update profile
-      const profileData: any = {
+      let mediaId: string | undefined;
+
+      // Handle avatar upload via direct R2 flow
+      if (selectedImage) {
+        const uploadResult = await mediaService.uploadAvatar(selectedImage);
+        mediaId = uploadResult.mediaId;
+      }
+
+      // Update profile with mediaId or text fields
+      const updatedUser = await authService.updateProfile({
         name: name.trim(),
         email: email.trim(),
         username: username.trim(),
-      };
-
-      let updatedUser: any = null;
-
-      // Handle avatar upload
-      if (avatar && avatar.startsWith('file://')) {
-        // Create FormData for file upload
-        const formData = new FormData();
-        formData.append('name', name.trim());
-        formData.append('email', email.trim());
-        formData.append('username', username.trim());
-
-        const filename = avatar.split('/').pop() || 'photo.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-        formData.append('avatar', {
-          uri: avatar,
-          name: filename,
-          type,
-        } as any);
-
-        // Use fetch for FormData
-        const token = await authStorage.getToken();
-        if (!token) {
-          throw new Error('No authentication token found. Please login again.');
-        }
-
-        const baseUrl = API_BASE_URL.replace('/api', '');
-        const response = await fetch(`${baseUrl}/api/auth/profile`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            // Don't set Content-Type for FormData - let the browser set it with boundary
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to update profile' }));
-          throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || result.message || 'Failed to update profile');
-        }
-        updatedUser = result.data?.user ?? result.user ?? null;
-      } else {
-        // Update without file upload
-        if (avatar) profileData.avatar = avatar;
-        updatedUser = await authService.updateProfile(profileData);
-      }
+        mediaId,
+      });
 
       // Persist latest user locally so avatar/name updates apply immediately
       if (updatedUser) {
@@ -272,6 +225,8 @@ const EditProfileScreen: React.FC = () => {
     }
   };
 
+
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -301,10 +256,11 @@ const EditProfileScreen: React.FC = () => {
               onPress={showImagePickerOptions}
               style={styles.avatarContainer}
             >
-              {avatar ? (
+              {selectedImage?.uri || signedAvatarUrl || avatar ? (
                 <Image
-                  source={{ uri: getImageUrl(avatar) || avatar }}
+                  source={getAuthenticatedImageSource(selectedImage?.uri || signedAvatarUrl || avatar, token) || { uri: '' }}
                   style={styles.avatar}
+                  onError={() => reloadAvatar()}
                 />
               ) : (
                 <View style={styles.avatarPlaceholder}>

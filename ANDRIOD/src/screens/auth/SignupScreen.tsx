@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import AuthLayout, { authStyles } from '@components/auth/AuthLayout';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch } from '@store/hooks';
 import { signupUser } from '@store/slices/authSlice';
 import { validation } from '@utils/validation';
 import { ERROR_MESSAGES, ROUTES } from '@constants';
 import Button from '@components/common/Button';
-import Input from '@components/common/Input';
+import Input from '@components/auth/AuthInput';
 import Toast from 'react-native-toast-message';
 
 const SignupScreen: React.FC = () => {
@@ -55,12 +55,11 @@ const SignupScreen: React.FC = () => {
   };
 
   const handleSignup = async () => {
-    if (!validate()) return;
+    if (loading || !validate()) return;
 
     setLoading(true);
     try {
-      console.log('📝 Signup attempt started');
-      const result = await dispatch(
+      await dispatch(
         signupUser({
           email: formData.email,
           password: formData.password,
@@ -69,15 +68,13 @@ const SignupScreen: React.FC = () => {
           referralCode: formData.referralCode || undefined,
         })
       ).unwrap();
-      console.log('✅ Signup successful:', result);
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Account created successfully!',
+        text2: 'Account created successfully! Please log in.',
       });
-      navigation.replace('MainTabs');
+      navigation.replace('Login');
     } catch (error: any) {
-      console.error('❌ Signup failed:', error);
       const errorMessage = error || ERROR_MESSAGES.USER_EXISTS;
       Toast.show({
         type: 'error',
@@ -91,137 +88,17 @@ const SignupScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Sign up to get started</Text>
-        </View>
-
-        <View style={styles.form}>
-          <Input
-            label="Full Name"
-            placeholder="Enter your full name"
-            value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
-            error={errors.name}
-          />
-
-          <Input
-            label="Username"
-            placeholder="Choose a username"
-            value={formData.username}
-            onChangeText={(text) => setFormData({ ...formData, username: text })}
-            autoCapitalize="none"
-            error={errors.username}
-          />
-
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            value={formData.email}
-            onChangeText={(text) => setFormData({ ...formData, email: text })}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-          />
-
-          <Input
-            label="Password"
-            placeholder="Create a password"
-            value={formData.password}
-            onChangeText={(text) => setFormData({ ...formData, password: text })}
-            secureTextEntry
-            error={errors.password}
-          />
-
-          <Input
-            label="Confirm Password"
-            placeholder="Confirm your password"
-            value={formData.confirmPassword}
-            onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
-            secureTextEntry
-            error={errors.confirmPassword}
-          />
-
-          <Input
-            label="Referral Code (Optional)"
-            placeholder="Enter referral code if any"
-            value={formData.referralCode}
-            onChangeText={(text) => setFormData({ ...formData, referralCode: text })}
-            autoCapitalize="characters"
-          />
-
-          <Button
-            title="Sign Up"
-            onPress={handleSignup}
-            loading={loading}
-            style={styles.signupButton}
-          />
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <Text
-              style={styles.link}
-              onPress={() => navigation.navigate(ROUTES.LOGIN)}
-            >
-              Sign In
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <AuthLayout signup title="Create your account" subtitle="Get started with a few details. You’ll log in after signing up." loading={loading} onSwitch={() => navigation.navigate(ROUTES.LOGIN)}>
+      <Input label="Full name" placeholder="Your full name" value={formData.name} onChangeText={text => setFormData({ ...formData, name: text })} autoComplete="name" autoCapitalize="words" error={errors.name} editable={!loading} />
+      <Input label="Username" placeholder="Choose a username" value={formData.username} onChangeText={text => setFormData({ ...formData, username: text })} autoCapitalize="none" autoCorrect={false} autoComplete="username-new" error={errors.username} editable={!loading} />
+      <Input label="Email address" placeholder="you@example.com" value={formData.email} onChangeText={text => setFormData({ ...formData, email: text })} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" error={errors.email} editable={!loading} />
+      <Input label="Password" placeholder="At least 6 characters" value={formData.password} onChangeText={text => setFormData({ ...formData, password: text })} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="new-password" error={errors.password} editable={!loading} />
+      <Input label="Confirm password" placeholder="Re-enter your password" value={formData.confirmPassword} onChangeText={text => setFormData({ ...formData, confirmPassword: text })} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="new-password" error={errors.confirmPassword} editable={!loading} />
+      <Input label="Referral code · optional" placeholder="Have a code? Enter it here" value={formData.referralCode} onChangeText={text => setFormData({ ...formData, referralCode: text })} autoCapitalize="characters" autoCorrect={false} editable={!loading} returnKeyType="done" onSubmitEditing={handleSignup} />
+      <Button title="Create account" onPress={handleSignup} loading={loading} style={authStyles.submit} />
+    </AuthLayout>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  header: {
-    marginTop: 40,
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 8,
-    marginTop: 20,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  form: {
-    width: '100%',
-  },
-  signupButton: {
-    marginTop: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  link: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-});
 
 export default SignupScreen;
 

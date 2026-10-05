@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 
-function generateToken(userId, { type = 'access', expiresIn } = {}) {
+function generateToken(userId, { type = 'access', expiresIn, tokenVersion = 0 } = {}) {
   const secret = type === 'refresh' ? (process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET) : process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET must be configured');
-  return jwt.sign({ userId, type }, secret, {
+  return jwt.sign({ userId, type, tokenVersion }, secret, {
     expiresIn: expiresIn || (type === 'refresh' ? process.env.JWT_REFRESH_EXPIRE || '7d' : process.env.JWT_EXPIRE || '1h'),
     algorithm: 'HS256',
   });

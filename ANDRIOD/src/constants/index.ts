@@ -57,6 +57,8 @@ export const ROUTES = {
   SPLASH: 'Splash',
   ONBOARDING: 'Onboarding',
   LOGIN: 'Login',
+  FORGOT_PASSWORD: 'ForgotPassword',
+  RESET_PASSWORD: 'ResetPassword',
   SIGNUP: 'Signup',
   INSTAGRAM_ID: 'InstagramId',
 

@@ -15,9 +15,12 @@ import { API_BASE_URL } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
 
 const CreatorCoinRequestsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const [requests, setRequests] = useState<CreatorCoinRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +104,7 @@ const CreatorCoinRequestsScreen: React.FC = () => {
 
         {proofUrl && (
           <Image
-            source={{ uri: proofUrl }}
+            source={getAuthenticatedMediaSource(item.paymentProof || proofUrl, token) || { uri: '' }}
             style={styles.proofImage}
             resizeMode="cover"
             onError={(error) => {

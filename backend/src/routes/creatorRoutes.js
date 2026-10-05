@@ -28,7 +28,7 @@ router.post('/register', protect, registerAsCreator);
 router.get('/dashboard', protect, getCreatorDashboard);
 
 // Coin requests
-router.post('/request-coins', protect, upload.single('paymentProof'), requestCoins);
+router.post('/request-coins', protect, upload.single('paymentProof'), require('../middleware/mediaReference')('paymentProof'), requestCoins);
 router.get('/coin-requests', protect, getCoinRequests);
 
 // Creator task management

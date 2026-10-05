@@ -1,5 +1,6 @@
 import type { WatchSession, HeartbeatInput, HeartbeatResult, CompletionResult } from './watchTypes';
 import { apiService } from './api';
+import { mediaService } from './mediaService';
 import { Task } from '@types';
 
 export const taskService = {
@@ -42,23 +43,32 @@ export const taskService = {
   },
 
   async submitTaskProof(taskId: string, proofImageUri: string): Promise<{ message: string; submissionStatus: string }> {
-    const formData = new FormData();
-    formData.append('proofImage', {
-      uri: proofImageUri,
-      type: 'image/jpeg',
-      name: 'proof.jpg',
-    } as any);
+    try {
+      const { mediaId } = await mediaService.uploadAvatar({ uri: proofImageUri });
+      const response = await apiService.post<{ message: string; submissionStatus: string }>(
+        `/tasks/${taskId}/submit-proof`,
+        { mediaId }
+      );
+      return response.data as { message: string; submissionStatus: string };
+    } catch {
+      const formData = new FormData();
+      formData.append('proofImage', {
+        uri: proofImageUri,
+        type: 'image/jpeg',
+        name: 'proof.jpg',
+      } as any);
 
-    const response = await apiService.post<{ message: string; submissionStatus: string }>(
-      `/tasks/${taskId}/submit-proof`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-    return response.data as { message: string; submissionStatus: string };
+      const response = await apiService.post<{ message: string; submissionStatus: string }>(
+        `/tasks/${taskId}/submit-proof`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      return response.data as { message: string; submissionStatus: string };
+    }
   },
 };
 

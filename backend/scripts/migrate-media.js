@@ -6,8 +6,8 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
-const { GetObjectCommand } = require('@aws-sdk/client-s3');
-const { targetIdentity, fingerprint, assertFresh } = require('../src/services/reconciliation-media/migration-safety');
+const { GetObjectCommand, HeadBucketCommand } = require('@aws-sdk/client-s3');
+const { sourcePrefixes, targetIdentity, fingerprint, assertFresh } = require('../src/services/reconciliation-media/migration-safety');
 const { parseUrl } = require('../src/services/reconciliation-media');
 const { verifyEvidence } = require('./reconcile-media');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -23,6 +23,7 @@ function options(args, env) {
   // Production execution is deliberately unavailable in this validation phase.
   if (execute && (env.NODE_ENV === 'production' || !/(?:^|[-_])(staging|test)(?:$|[-_])/.test(env.R2_BUCKET || ''))) throw new Error('Production migration is disabled');
   if (execute && (!/(?:^|[-_/])(staging|test)(?:$|[-_/])/.test(env.CLOUDINARY_FOLDER_PREFIX || '') || env.MEDIA_MIGRATION_SOURCE_CONFIRM !== env.CLOUDINARY_FOLDER_PREFIX)) throw new Error('Execution requires an explicitly confirmed staging/test Cloudinary prefix');
+  if (execute && env.MEDIA_MIGRATION_SOURCE_PREFIXES !== undefined && env.MEDIA_MIGRATION_SOURCE_PREFIXES_CONFIRM !== sourcePrefixes(env).join(',')) throw Error('MIGRATION_SOURCE_CONFIRMATION_REQUIRED');
   return { execute, journal, executionArgs: args };
 }
 function plan(asset, cloud) {
@@ -68,14 +69,16 @@ async function run(input) {
   const issued = verifyEvidence(reconciliation, env);
   const { inventory, target } = issued;
   const cloud = target.cloud;
+  const effectiveSourcePrefixes = reconciliation.migrationBinding.sourcePrefixes;
+  if (execute && fingerprint(effectiveSourcePrefixes) !== fingerprint(target.sourcePrefixes)) throw Error('MIGRATION_SOURCE_CONFIRMATION_REQUIRED');
   if (!reconciliation?.completed || !Array.isArray(reconciliation.references)) throw new Error('RECONCILIATION_REQUIRED');
   if (reconciliation.missingCloudinarySources || reconciliation.malformedReferences || reconciliation.metadataMismatches) throw new Error('RECONCILIATION_REVIEW_REQUIRED');
   const referenced = new Map(reconciliation.references.filter(r => r.classification === 'exists' && !r.metadataMismatch).map(r => [r.metadata.assetId, r.metadata]));
-  const summary = { mode: execute ? 'EXECUTE' : 'DRY_RUN', environment: reconciliation.environment, readiness: reconciliation.readiness, referencedAssets: referenced.size, unreferencedAssets: reconciliation.unreferencedCloudinaryAssets, total: 0, eligible: 0, skipped: 0, conflicts: 0, estimatedBytes: 0, wouldMigrate: 0, migrated: 0, failed: 0, assets: [] };
+  const summary = { mode: execute ? 'EXECUTE' : 'DRY_RUN', destinationBucket: target.bucket, sourcePrefixes: effectiveSourcePrefixes, sourceScopeMode: reconciliation.migrationBinding.sourceScopeMode, sourceScopeValidation: 'PASS', eligibleImages: 0, eligibleVideos: 0, externalOrLocalReferences: reconciliation.externalOrLocalReferences, missingSources: reconciliation.missingCloudinarySources, journal: journal ? 'PENDING_INSPECTION' : 'NOT_SUPPLIED', writes: {mongodb: 0, r2: 0, cloudinary: 0}, environment: reconciliation.environment, readiness: reconciliation.readiness, referencedAssets: referenced.size, unreferencedAssets: reconciliation.unreferencedCloudinaryAssets, total: 0, eligible: 0, skipped: 0, conflicts: 0, estimatedBytes: 0, wouldMigrate: 0, migrated: 0, failed: 0, assets: [] };
   // Validate the complete referenced source set before any journal, destination read or copy.
   for (const asset of inventory) {
     if (!referenced.has(asset.asset_id)) continue;
-    if (!asset.public_id.startsWith(target.prefix + '/')) throw new Error('SOURCE_OUTSIDE_RECONCILED_SCOPE');
+    if (!effectiveSourcePrefixes.some(prefix => asset.public_id.startsWith(prefix + '/'))) throw new Error('SOURCE_OUTSIDE_RECONCILED_SCOPE');
     const urlIdentity = parseUrl(asset.secure_url, cloud);
     if (urlIdentity.kind !== 'cloudinary' || urlIdentity.public_id !== asset.public_id || urlIdentity.resource_type !== asset.resource_type || urlIdentity.type !== asset.type || (urlIdentity.version && String(urlIdentity.version) !== String(asset.version))) throw new Error('SOURCE_URL_SCOPE_MISMATCH');
     const ref = referenced.get(asset.asset_id);
@@ -86,7 +89,7 @@ async function run(input) {
   if (execute && !referenced.size) throw new Error('NO_REFERENCED_MIGRATION_CANDIDATES');
   const provider = new (require('../src/services/storage/r2.provider'))({ env });
   let states = {}, lock;
-  const scope = fingerprint({target,inventory:issued.inventoryFingerprint,references:reconciliation.migrationBinding.referencesFingerprint});
+  const scope = fingerprint({target,sourcePrefixes:effectiveSourcePrefixes,inventory:issued.inventoryFingerprint,references:reconciliation.migrationBinding.referencesFingerprint});
   // Revalidate against the actual runtime, not confirmation settings, immediately before work.
   function validateRuntime() {
     assertFresh(reconciliation.generatedAt);
@@ -94,10 +97,21 @@ async function run(input) {
   }
   try {
     validateRuntime();
-    if (execute) {
-      lock = fs.openSync(journal + '.lock', 'wx', 0o600);
-      try { if (fs.existsSync(journal)) { const data = JSON.parse(fs.readFileSync(journal, 'utf8')); if (data.scope !== scope) throw new Error('Journal scope mismatch'); states = data.assets; } }
-      catch (e) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); throw e; }
+    try { await provider.send(new HeadBucketCommand({Bucket: target.bucket})); }
+    catch { throw Error('R2_ACCESS'); }
+    if (journal) {
+      try {
+        if (fs.existsSync(journal + '.lock')) throw Error();
+        if (fs.existsSync(journal)) {
+          const data = JSON.parse(fs.readFileSync(journal, 'utf8'));
+          if (data.version !== 1 || data.scope !== scope || !data.assets || typeof data.assets !== 'object' || Array.isArray(data.assets)) throw Error();
+          states = data.assets; summary.journal = 'VERIFIED';
+        } else {
+          if (!fs.statSync(path.dirname(path.resolve(journal))).isDirectory()) throw Error();
+          summary.journal = 'NEW_JOURNAL';
+        }
+        if (execute) lock = fs.openSync(journal + '.lock', 'wx', 0o600);
+      } catch { throw Error('MIGRATION_JOURNAL'); }
     }
     function save() { const temp = journal + '.tmp'; const fd = fs.openSync(temp, 'w', 0o600); try { fs.writeFileSync(fd, JSON.stringify({ version: 1, scope, assets: states }, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } fs.renameSync(temp, journal); }
     const seen = new Set();
@@ -117,7 +131,7 @@ async function run(input) {
         catch { summary.failed++; record.status = 'destination_inspection_failed'; continue; }
         validateRuntime();
         if (exists && (!execute || !states[item.identity])) { summary.conflicts++; record.status = 'destination_exists'; continue; }
-        summary.eligible++; summary.estimatedBytes += item.bytes; summary.wouldMigrate++;
+        summary.eligible++; if (asset.resource_type === 'image') summary.eligibleImages++; if (asset.resource_type === 'video') summary.eligibleVideos++; summary.estimatedBytes += item.bytes; summary.wouldMigrate++;
         if (!execute) continue;
         const previous = states[item.identity];
         states[item.identity] = { ...previous, key: item.key, status: 'pending' }; save();
@@ -129,6 +143,10 @@ async function run(input) {
         if (!done) { summary.failed++; record.status = 'copy_or_verification_failed'; }
       }
     } finally { if (lock !== undefined) { fs.closeSync(lock); fs.unlinkSync(journal + '.lock'); } }
+    summary.status = summary.failed || summary.conflicts ? 'BLOCKED' : execute ? 'EXECUTION_COMPLETE' : 'DRY_RUN_READY';
+    if (summary.failed) summary.blockReason = 'R2_ACCESS_OR_COPY_VERIFICATION';
+    if (summary.conflicts) summary.blockReason = 'DESTINATION_CONFLICT';
+    if (execute) delete summary.writes; // A zero-write statement applies only to dry-run.
     output(JSON.stringify(summary, null, 2));
     return summary;
   } finally { provider.client.destroy(); }
@@ -141,5 +159,20 @@ async function main() {
   const report = await run({ reconciliation, ...opts });
   if (report.failed || report.conflicts) process.exitCode = 1;
 }
-if (require.main === module) main().catch(error => { console.error(JSON.stringify({ status: 'BLOCKED', httpStatus: error.httpStatus || null, network: ['ENOTFOUND','ECONNREFUSED','ETIMEDOUT'].includes(error.cause?.code) ? error.cause.code : error.name === 'TimeoutError' ? 'TIMEOUT' : undefined })); console.error('Migration BLOCKED: source/destination access, configuration or journal failed; provider details suppressed. No Cloudinary deletes or database changes performed.'); process.exitCode = 1; });
-module.exports = { options, plan, run };
+function diagnostic(error) {
+  const reason = error?.safeCode || error?.code || error?.message;
+  const groups = {
+    CLOUDINARY_SOURCE_SCOPE: ['SOURCE_OUTSIDE_RECONCILED_SCOPE','SOURCE_URL_SCOPE_MISMATCH','MIGRATION_SOURCE_SCOPE_INVALID'],
+    CLOUDINARY_ACCESS: ['CLOUDINARY_NETWORK_FAILURE','CLOUDINARY_METADATA_REQUEST_FAILED','INVALID_CLOUDINARY_INVENTORY','REPEATED_INVENTORY_CURSOR'],
+    R2_ACCESS: ['R2_ACCESS','R2_BUCKET_UNAVAILABLE','STORAGE_UNAVAILABLE'],
+    MIGRATION_JOURNAL: ['MIGRATION_JOURNAL'],
+    RECONCILIATION_NOT_READY: ['RECONCILIATION_REQUIRED','RECONCILIATION_REVIEW_REQUIRED','REFERENCED_SOURCE_NOT_IN_INVENTORY','SOURCE_CHANGED_SINCE_RECONCILIATION','NO_REFERENCED_MIGRATION_CANDIDATES','RECONCILIATION_EVIDENCE_NOT_ISSUED','RECONCILIATION_STALE_OR_INVALID','RECONCILIATION_TARGET_MISMATCH','RECONCILIATION_EVIDENCE_CHANGED','MIGRATION_RUNTIME_CHANGED'],
+    MIGRATION_AUTHORIZATION: ['MIGRATION_SOURCE_CONFIRMATION_REQUIRED','Production migration is disabled','Execution requires explicit production confirmation: --confirm-production','Production confirmation does not match runtime environment','MIGRATION_OVERRIDE_FORBIDDEN','Execution requires matching CLI authorization and journal'],
+    CONFIGURATION: ['MIGRATION_ENVIRONMENT_INVALID','MIGRATION_DATABASE_INVALID','MIGRATION_PROVIDER_INVALID','RECONCILIATION_CONFIGURATION_MISSING','R2_NOT_CONFIGURED','INVALID_R2_CONFIG','R2_PRIVATE_BUCKET_REQUIRED','R2_PUBLIC_URL_UNSUPPORTED','Cloudinary source configuration required','Unknown option','Journal path required'],
+  };
+  const blockReason = Object.keys(groups).find(group => groups[group].includes(reason)) || (error?.name?.startsWith('Mongo') ? 'DATABASE_ACCESS' : 'UNCLASSIFIED_PREFLIGHT');
+  // Never emit raw driver messages, stacks, causes, URLs or credential-bearing arguments.
+  return {status:'BLOCKED',blockReason,httpStatus:Number.isInteger(error?.httpStatus)?error.httpStatus:null};
+}
+if (require.main === module) main().catch(error => { console.error(JSON.stringify(diagnostic(error))); console.error('Migration BLOCKED; no Cloudinary deletes or database changes performed.'); process.exitCode = 1; });
+module.exports = { options, plan, run, diagnostic };

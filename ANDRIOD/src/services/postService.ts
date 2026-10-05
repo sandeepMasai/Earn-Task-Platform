@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { mediaService } from './mediaService';
 import { Post } from '@types';
 import { API_BASE_URL } from '@constants';
 
@@ -64,6 +65,31 @@ export const postService = {
     type: 'image' | 'video' | 'document' = 'image',
     videoDuration?: number
   ): Promise<Post> {
+    try {
+      const category = type === 'video' ? 'videos' : type === 'document' ? 'documents' : 'images';
+      const { mediaId } = await mediaService.uploadMedia({
+        uri: fileUri,
+        category,
+      });
+      const response = await apiService.post<Post>('/posts', {
+        mediaId,
+        caption,
+        type,
+        videoDuration,
+      });
+      const post = (response as any).data ?? response;
+      return {
+        ...post,
+        id: post._id || post.id,
+        imageUrl: post.imageUrl ? getImageUrl(post.imageUrl) : undefined,
+        videoUrl: post.videoUrl ? getImageUrl(post.videoUrl) : undefined,
+        documentUrl: post.documentUrl ? getImageUrl(post.documentUrl) : undefined,
+        thumbnailUrl: post.thumbnailUrl ? getImageUrl(post.thumbnailUrl) : undefined,
+      };
+    } catch {
+      // Fall back to multipart if direct upload fails
+    }
+
     const formData = new FormData();
     
     // Determine file type and name

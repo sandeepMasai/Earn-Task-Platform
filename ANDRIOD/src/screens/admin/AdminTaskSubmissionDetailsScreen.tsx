@@ -14,13 +14,17 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { adminService, TaskSubmission } from '@services/adminService';
 import { formatCoins, formatDate } from '@utils/validation';
 import { API_BASE_URL } from '@constants';
-import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
+import { AuthenticatedImage } from '@components/common/AuthenticatedImage';
 
 const AdminTaskSubmissionDetailsScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const submissionId = route.params?.submissionId;
 
   const [submission, setSubmission] = useState<TaskSubmission | null>(null);
@@ -284,8 +288,8 @@ const AdminTaskSubmissionDetailsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Proof Screenshot</Text>
           <View style={styles.proofContainer}>
-            <Image
-              source={{ uri: getProofImageUrl(submission.proofImage) }}
+            <AuthenticatedImage
+              source={submission.proofImage}
               style={styles.proofImage}
               resizeMode="contain"
             />

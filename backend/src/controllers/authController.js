@@ -48,8 +48,8 @@ exports.signup = async (req, res) => {
     });
 
     if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
-    const accessToken = generateToken(user._id);
-    const refreshToken = generateToken(user._id, { type: 'refresh' });
+    const accessToken = generateToken(user._id, { tokenVersion: user.tokenVersion });
+    const refreshToken = generateToken(user._id, { type: 'refresh', tokenVersion: user.tokenVersion });
     const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.status(201).json({
@@ -93,7 +93,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select('+password +tokenVersion');
 
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
@@ -103,8 +103,8 @@ exports.login = async (req, res) => {
     }
 
     if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
-    const accessToken = generateToken(user._id);
-    const refreshToken = generateToken(user._id, { type: 'refresh' });
+    const accessToken = generateToken(user._id, { tokenVersion: user.tokenVersion });
+    const refreshToken = generateToken(user._id, { type: 'refresh', tokenVersion: user.tokenVersion });
     const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.json({
@@ -116,6 +116,8 @@ exports.login = async (req, res) => {
           name: user.name,
           username: user.username,
           avatar: user.avatar || null,
+          avatarAsset: user.avatarAsset || null,
+          mediaAsset: user.avatarAsset || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -151,6 +153,8 @@ exports.getMe = async (req, res) => {
           name: user.name,
           username: user.username,
           avatar: user.avatar || null,
+          avatarAsset: user.avatarAsset || null,
+          mediaAsset: user.avatarAsset || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -192,6 +196,9 @@ exports.getUserById = async (req, res) => {
           email: user.email,
           name: user.name,
           username: user.username,
+          avatar: user.avatar || null,
+          avatarAsset: user.avatarAsset || null,
+          mediaAsset: user.avatarAsset || null,
           instagramId: user.instagramId,
           coins: user.coins,
           totalEarned: user.totalEarned,
@@ -230,6 +237,8 @@ exports.updateInstagramId = async (req, res) => {
           name: user.name,
           username: user.username,
           avatar: user.avatar || null,
+          avatarAsset: user.avatarAsset || null,
+          mediaAsset: user.avatarAsset || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -316,6 +325,8 @@ exports.updateProfile = async (req, res) => {
           name: user.name,
           username: user.username,
           avatar: user.avatar,
+          avatarAsset: user.avatarAsset || null,
+          mediaAsset: user.avatarAsset || null,
           coins: user.coins,
           totalEarned: user.totalEarned,
           totalWithdrawn: user.totalWithdrawn,
@@ -354,7 +365,7 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user._id).select('+password');
+    const user = await User.findById(req.user._id).select('+password +tokenVersion');
 
     if (!user) {
       return res.status(404).json({
@@ -412,13 +423,14 @@ exports.refreshToken = async (req, res) => {
     );
 
     if (decoded.type !== 'refresh') return res.status(401).json({ success: false, error: 'Invalid refresh token' });
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select('+tokenVersion');
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) return res.status(401).json({ success: false, error: 'Invalid refresh token' });
     if (!user.isActive) return res.status(403).json({ success: false, error: 'Account is blocked' });
-    const accessToken = generateToken(user._id);
+    const accessToken = generateToken(user._id, { tokenVersion: user.tokenVersion });
     const expiresAt = new Date(jwt.decode(accessToken).exp * 1000);
 
     res.json({

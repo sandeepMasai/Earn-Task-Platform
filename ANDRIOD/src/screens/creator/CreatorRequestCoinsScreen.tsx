@@ -19,6 +19,7 @@ import Button from '@components/common/Button';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { getAuthenticatedImageSource } from '@utils/mediaUrl';
 
 const CreatorRequestCoinsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -48,7 +49,7 @@ const CreatorRequestCoinsScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -255,7 +256,7 @@ const CreatorRequestCoinsScreen: React.FC = () => {
             </Text>
             {paymentProof ? (
               <View style={styles.proofPreview}>
-                <Image source={{ uri: paymentProof }} style={styles.proofImage} />
+                <Image source={getAuthenticatedImageSource(paymentProof) || { uri: paymentProof }} style={styles.proofImage} />
                 <TouchableOpacity
                   onPress={() => setPaymentProof(null)}
                   style={styles.removeButton}

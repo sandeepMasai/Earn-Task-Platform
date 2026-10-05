@@ -16,9 +16,12 @@ import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { API_BASE_URL } from '@constants';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedMediaSource } from '@utils/mediaUrl';
 
 const AdminTaskSubmissionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -123,7 +126,7 @@ const AdminTaskSubmissionsScreen: React.FC = () => {
 
       <View style={styles.proofPreview}>
         <Image
-          source={{ uri: getProofImageUrl(item.proofImage) }}
+          source={getAuthenticatedMediaSource(item.proofImage, token) || { uri: '' }}
           style={styles.proofThumbnail}
         />
         <View style={styles.proofOverlay}>

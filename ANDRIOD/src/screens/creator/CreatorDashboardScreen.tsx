@@ -13,10 +13,12 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { creatorService, CreatorDashboard } from '@services/creatorService';
 import { formatCoins, formatTime } from '@utils/validation';
-import { ROUTES, API_BASE_URL } from '@constants';
+import { ROUTES } from '@constants';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useAppSelector } from '@store/hooks';
+import { getAuthenticatedImageSource } from '@utils/mediaUrl';
 
 interface CreatorTask {
   id: string;
@@ -39,6 +41,7 @@ interface CreatorTask {
 
 const CreatorDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const token = useAppSelector((state) => state.auth.token);
   const [dashboard, setDashboard] = useState<CreatorDashboard | null>(null);
   const [tasks, setTasks] = useState<CreatorTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -191,16 +194,6 @@ const CreatorDashboardScreen: React.FC = () => {
       upload_post: 'Upload Post',
     };
     return typeMap[type] || type;
-  };
-
-  const getImageUrl = (imagePath?: string): string | null => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    // Handle relative paths
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
   };
 
   const getFilteredTasks = (): CreatorTask[] => {
@@ -480,16 +473,16 @@ const CreatorDashboardScreen: React.FC = () => {
 
           {paginatedTasks.length > 0 ? (
             paginatedTasks.map((task) => {
-              const thumbnailUrl = getImageUrl(task.thumbnail);
+              const thumbnailSource = getAuthenticatedImageSource(task.thumbnail, token);
               return (
                 <View key={task.id} style={styles.taskCard}>
-                  {thumbnailUrl && (
+                  {thumbnailSource && (
                     <TouchableOpacity
                       onPress={() => handleTaskPress(task)}
                       activeOpacity={0.7}
                     >
                       <Image
-                        source={{ uri: thumbnailUrl }}
+                        source={thumbnailSource}
                         style={styles.taskThumbnail}
                         resizeMode="cover"
                       />
